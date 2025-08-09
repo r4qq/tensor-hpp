@@ -1,6 +1,6 @@
 /**
  * @file Tensor.hpp
- * @brief Lightweight generic 2D tensor (matrix) implementation.
+ * @brief Lightweight generic N-dimensional tensor (matrix) implementation.
  * @author r4qq
  * @date 2025
  */
@@ -11,6 +11,7 @@
 #include <array>
 #include <cstddef>
 #include <functional>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -19,17 +20,36 @@
 
 namespace Tensor
 {
-    
+    /**
+     * @class Tensor
+     * @brief A generic N-dimensional tensor supporting element-wise operations.
+     *
+     * Provides:
+     * - Basic element access
+     * - Element-wise arithmetic
+     * - Scalar operations
+     * - Matrix transpose (for rank-2 tensors)
+     *
+     * @tparam T Element type (must be arithmetic).
+     */
     template<typename T>
     class Tensor
     {
         static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
 
     private:
-        std::vector<size_t> _shape;       
-        std::vector<size_t> _strides;
-        std::vector<T> _data;           
+        std::vector<size_t> _shape;       ///< Dimensions of the tensor.
+        std::vector<size_t> _strides;     ///< Stride values for flat indexing.
+        std::vector<T> _data;             ///< Contiguous storage for tensor data.
 
+        /**
+         * @brief Apply an element-wise binary operation between two tensors.
+         * @tparam BinaryOp Binary operation type (e.g., std::plus, std::multiplies).
+         * @param otherTensor The other tensor to combine with.
+         * @param op Binary operation functor.
+         * @return New tensor containing the result.
+         * @throws std::invalid_argument if shapes do not match.
+         */
         template<typename BinaryOp>
         inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
@@ -37,130 +57,159 @@ namespace Tensor
                 throw std::invalid_argument("Tensor shape mismatch");
 
             Tensor<T> result(_shape);
-
-            std::transform(_data.begin(), 
-                           _data.end(), 
-                           otherTensor._data.begin(), 
+            std::transform(_data.begin(),
+                           _data.end(),
+                           otherTensor._data.begin(),
                            result._data.begin(),
-                           op);      
-
-            return result;     
+                           op);
+            return result;
         }
 
+        /**
+         * @brief Compute the flat index from N-dimensional indices.
+         * @tparam N Number of dimensions.
+         * @param indices N-dimensional index array.
+         * @return Flat index into the internal storage.
+         */
         template<size_t N>
         size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
-            size_t flatIndex = 0;
-            for(size_t i = 0; i < indices.size(); i++)
-            {
-                flatIndex += _strides[i] * indices[i];
-            }
-
-            return flatIndex;
+            return std::inner_product(_strides.begin(),
+                                      _strides.end(),
+                                      indices.begin(),
+                                      size_t(0));
         }
 
     public:
-       
-        Tensor(std::vector<size_t> shape):
-            _shape(std::move(shape)), 
-            _strides(_shape.size(), 1),
-            _data([&]()
-            {    
-                // Strides (row-major)
-                for (size_t i = shape.size(); i-- > 1; )
-                {
-                    _strides[i - 1] = _strides[i] * _shape[i];
-                }
-
-                // Compute total size
-                size_t totalSize = 1;
-                for (size_t dim : _shape)
-                {
-                    if (dim == 0)
-                        throw std::invalid_argument("Shape dimensions must be greater than 0");
-                    totalSize *= dim;
-                }
-                return totalSize;
-            })  
+        /**
+         * @brief Construct a tensor of given shape with default-initialized elements.
+         * @param shape Vector specifying the size of each dimension.
+         * @throws std::invalid_argument if any dimension is zero.
+         */
+        Tensor(std::vector<size_t> shape)
+            : _shape(std::move(shape)),
+              _strides(_shape.size(), 1)
+        {
+            // Compute strides (row-major order)
+            for (size_t i = _shape.size(); i-- > 1; )
             {
-                //empty constructor body - all done in initializer list
+                _strides[i - 1] = _strides[i] * _shape[i];
             }
 
+            // Compute total size
+            size_t totalSize = 1;
+            for (size_t dim : _shape)
+            {
+                if (dim == 0)
+                    throw std::invalid_argument("Shape dimensions must be greater than 0");
+                totalSize *= dim;
+            }
+
+            _data.resize(totalSize);
+        }
+
+        /// Default destructor.
         ~Tensor() = default;
 
+        /**
+         * @brief Mutable element access.
+         * @tparam Indices Variadic list of index arguments.
+         * @param indices N-dimensional indices.
+         * @return Reference to the element.
+         * @throws std::out_of_range if any index is invalid.
+         */
         template<typename... Indices>
         T& operator()(Indices... indices)
         {
             static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
-            for(size_t i = 0; i < _shape.size(); i++)
+            for (size_t i = 0; i < _shape.size(); i++)
             {
-                if(idxArr[i] >= _shape[i])
-                    throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
+                if (idxArr[i] >= _shape[i])
+                    throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
             }
-
             return _data[computeFlatIndex(idxArr)];
         }
 
+        /**
+         * @brief Const element access.
+         * @tparam Indices Variadic list of index arguments.
+         * @param indices N-dimensional indices.
+         * @return Const reference to the element.
+         * @throws std::out_of_range if any index is invalid.
+         */
         template<typename... Indices>
         const T& operator()(Indices... indices) const
         {
             static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
-            for(size_t i = 0; i < _shape.size(); i++)
+            for (size_t i = 0; i < _shape.size(); i++)
             {
-                if(idxArr[i] >= _shape[i])
-                    throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
+                if (idxArr[i] >= _shape[i])
+                    throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
             }
-
             return _data[computeFlatIndex(idxArr)];
         }
-       
+
+        /// Equality comparison.
         bool operator==(const Tensor<T>& otherTensor) const
         {
-            return _shape == otherTensor._shape && 
-                   _strides == otherTensor._strides && 
+            return _shape == otherTensor._shape &&
+                   _strides == otherTensor._strides &&
                    _data == otherTensor._data;
         }
- 
+
+        /// Inequality comparison.
         bool operator!=(const Tensor<T>& otherTensor) const
         {
             return !(*this == otherTensor);
         }
 
+        /// Element-wise addition.
         Tensor<T> operator+(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::plus<T>());
         }
 
+        /// Element-wise subtraction.
         Tensor<T> operator-(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::minus<T>());
         }
 
-     
+        /// Scalar multiplication.
         Tensor<T> operator*(const T& scalar) const
         {
             Tensor<T> result(_shape);
             std::transform(_data.begin(), _data.end(), result._data.begin(),
-                           [&scalar](const T& val){ return val * scalar; });
+                           [&scalar](const T& val) { return val * scalar; });
             return result;
         }
 
-        //element-wise multiplication
+        /// Element-wise multiplication.
         Tensor<T> operator*(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::multiplies<T>());
         }
 
+        /**
+         * @brief Matrix multiplication (not yet implemented).
+         * @throws std::logic_error Always, until implemented.
+         */
         Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
-            //todo matrix multiplication
+            throw std::logic_error("matmul() not implemented yet");
         }
-      
+
+        /**
+         * @brief Transpose a rank-2 tensor (matrix).
+         * @return New tensor with rows and columns swapped.
+         * @throws std::logic_error if tensor is not 2-dimensional.
+         */
         Tensor<T> transpose() const
         {
-            static_assert(_shape.size() == 2, "Trasnposition only supports matrices for now");
+            if (_shape.size() != 2)
+                throw std::logic_error("Transposition only supports matrices for now");
 
             size_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
@@ -172,15 +221,27 @@ namespace Tensor
             return result;
         }
 
+        /**
+         * @brief Fill the tensor with a specified value.
+         * @tparam U Type convertible to T.
+         * @param value Value to fill.
+         */
         template<typename U>
         void fill(const U& value)
         {
             static_assert(std::is_convertible<U, T>::value, "U must be convertible to T");
             std::fill(_data.begin(), _data.end(), static_cast<T>(value));
         }
-
     };
-   
+
+    /**
+     * @brief Scalar-tensor multiplication (scalar on left-hand side).
+     * @tparam T Tensor element type.
+     * @tparam U Scalar type.
+     * @param scalar Scalar value.
+     * @param tensor Tensor object.
+     * @return New tensor after scalar multiplication.
+     */
     template<typename T, typename U>
     Tensor<T> operator*(const U& scalar, const Tensor<T>& tensor)
     {
