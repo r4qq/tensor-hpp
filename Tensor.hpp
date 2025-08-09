@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace Tensor
@@ -25,19 +26,22 @@ namespace Tensor
         static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
 
     private:
-        std::vector<size_t> shape;       
-        std::vector<size_t> strides;
-        std::vector<T> data;           
+        std::vector<size_t> _shape;       
+        std::vector<size_t> _strides;
+        std::vector<T> _data;           
 
         template<typename BinaryOp>
         inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
-            Tensor<T> result(this->shape);
+            if (_shape != otherTensor._shape) 
+                throw std::invalid_argument("Tensor shape mismatch");
 
-            std::transform(this->data.begin(), 
-                           this->data.end(), 
-                           otherTensor.data.begin(), 
-                           result.data.begin(),
+            Tensor<T> result(_shape);
+
+            std::transform(_data.begin(), 
+                           _data.end(), 
+                           otherTensor._data.begin(), 
+                           result._data.begin(),
                            op);      
 
             return result;     
@@ -49,7 +53,7 @@ namespace Tensor
             size_t flatIndex = 0;
             for(size_t i = 0; i < indices.size(); i++)
             {
-                flatIndex += strides[i] * indices[i];
+                flatIndex += _strides[i] * indices[i];
             }
 
             return flatIndex;
@@ -57,27 +61,29 @@ namespace Tensor
 
     public:
        
-        Tensor(std::vector<size_t> shape)
-            : shape(std::move(shape)), 
-              strides(this->shape.size(), 1),  
-              data(1)                          // Will be resized later
-            {
+        Tensor(std::vector<size_t> shape):
+            _shape(std::move(shape)), 
+            _strides(_shape.size(), 1),
+            _data([&]()
+            {    
                 // Strides (row-major)
                 for (size_t i = shape.size(); i-- > 1; )
                 {
-                    strides[i - 1] = strides[i] * this->shape[i];
+                    _strides[i - 1] = _strides[i] * _shape[i];
                 }
 
                 // Compute total size
                 size_t totalSize = 1;
-                for (size_t dim : this->shape)
+                for (size_t dim : _shape)
                 {
                     if (dim == 0)
-                        throw std::invalid_argument("Shape dimensions must be non-zero");
+                        throw std::invalid_argument("Shape dimensions must be greater than 0");
                     totalSize *= dim;
                 }
-
-                data.resize(totalSize);
+                return totalSize;
+            })  
+            {
+                //empty constructor body - all done in initializer list
             }
 
         ~Tensor() = default;
@@ -85,36 +91,36 @@ namespace Tensor
         template<typename... Indices>
         T& operator()(Indices... indices)
         {
-            static_assert(sizeof...(indices) == shape.size(), "Invalid number of indices");
+            static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
-            for(size_t i = 0; i < shape.size(); i++)
+            for(size_t i = 0; i < _shape.size(); i++)
             {
-                if(idxArr[i] >= shape[i])
+                if(idxArr[i] >= _shape[i])
                     throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
             }
 
-            return data[computeFlatIndex(idxArr)];
+            return _data[computeFlatIndex(idxArr)];
         }
 
         template<typename... Indices>
         const T& operator()(Indices... indices) const
         {
-            static_assert(sizeof...(indices) == shape.size(), "Invalid number of indices");
+            static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
-            for(size_t i = 0; i < shape.size(); i++)
+            for(size_t i = 0; i < _shape.size(); i++)
             {
-                if(idxArr[i] >= shape[i])
+                if(idxArr[i] >= _shape[i])
                     throw std::out_of_range("Index" + std::to_string(idxArr[i]) + " is out of range");
             }
 
-            return data[computeFlatIndex(idxArr)];
+            return _data[computeFlatIndex(idxArr)];
         }
        
         bool operator==(const Tensor<T>& otherTensor) const
         {
-            return this->shape == otherTensor.shape && 
-                   this->strides == otherTensor.strides && 
-                   this->data == otherTensor.data;
+            return _shape == otherTensor._shape && 
+                   _strides == otherTensor._strides && 
+                   _data == otherTensor._data;
         }
  
         bool operator!=(const Tensor<T>& otherTensor) const
@@ -135,8 +141,8 @@ namespace Tensor
      
         Tensor<T> operator*(const T& scalar) const
         {
-            Tensor<T> result(this->shape);
-            std::transform(data.begin(), data.end(), result.data.begin(),
+            Tensor<T> result(_shape);
+            std::transform(_data.begin(), _data.end(), result._data.begin(),
                            [&scalar](const T& val){ return val * scalar; });
             return result;
         }
@@ -154,9 +160,9 @@ namespace Tensor
       
         Tensor<T> transpose() const
         {
-            static_assert(shape.size() == 2, "Trasnposition only supports matrices for now");
+            static_assert(_shape.size() == 2, "Trasnposition only supports matrices for now");
 
-            size_t rows = shape[0], cols = shape[1];
+            size_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
 
             for (size_t i = 0; i < rows; ++i)
@@ -170,7 +176,7 @@ namespace Tensor
         void fill(const U& value)
         {
             static_assert(std::is_convertible<U, T>::value, "U must be convertible to T");
-            std::fill(data.begin(), data.end(), static_cast<T>(value));
+            std::fill(_data.begin(), _data.end(), static_cast<T>(value));
         }
 
     };
