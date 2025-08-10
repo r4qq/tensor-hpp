@@ -116,13 +116,17 @@ namespace Tensor
          * @tparam Indices Variadic list of index arguments.
          * @param indices N-dimensional indices.
          * @return Reference to the element.
+         * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
          * @throws std::out_of_range if any index is invalid.
          */
         template<typename... Indices>
         T& operator()(Indices... indices)
         {
-            static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
+            if (sizeof...(indices) != _shape.size()) 
+                throw std::invalid_argument("Invalid number of indices");
+
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            
             for (size_t i = 0; i < _shape.size(); i++)
             {
                 if (idxArr[i] >= _shape[i])
@@ -136,13 +140,17 @@ namespace Tensor
          * @tparam Indices Variadic list of index arguments.
          * @param indices N-dimensional indices.
          * @return Const reference to the element.
+         * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
          * @throws std::out_of_range if any index is invalid.
          */
         template<typename... Indices>
         const T& operator()(Indices... indices) const
         {
-            static_assert(sizeof...(indices) == _shape.size(), "Invalid number of indices");
+            if (sizeof...(indices) != _shape.size()) 
+                throw std::invalid_argument("Invalid number of indices");
+
             std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            
             for (size_t i = 0; i < _shape.size(); i++)
             {
                 if (idxArr[i] >= _shape[i])
