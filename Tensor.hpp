@@ -74,6 +74,9 @@ namespace Tensor
         template<size_t N>
         size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
+            if (N != _strides.size())
+                throw std::invalid_argument("Index rank mismatch");
+            
             return std::inner_product(_strides.begin(),
                                       _strides.end(),
                                       indices.begin(),
@@ -163,7 +166,6 @@ namespace Tensor
         bool operator==(const Tensor<T>& otherTensor) const
         {
             return _shape == otherTensor._shape &&
-                   _strides == otherTensor._strides &&
                    _data == otherTensor._data;
         }
 
@@ -185,6 +187,12 @@ namespace Tensor
             return elementWiseOp(otherTensor, std::minus<T>());
         }
 
+        /// Element-wise multiplication.
+        Tensor<T> operator*(const Tensor<T>& otherTensor) const
+        {
+            return elementWiseOp(otherTensor, std::multiplies<T>());
+        }
+
         /// Scalar multiplication.
         Tensor<T> operator*(const T& scalar) const
         {
@@ -192,12 +200,6 @@ namespace Tensor
             std::transform(_data.begin(), _data.end(), result._data.begin(),
                            [&scalar](const T& val) { return val * scalar; });
             return result;
-        }
-
-        /// Element-wise multiplication.
-        Tensor<T> operator*(const Tensor<T>& otherTensor) const
-        {
-            return elementWiseOp(otherTensor, std::multiplies<T>());
         }
 
         /**
@@ -240,6 +242,14 @@ namespace Tensor
             static_assert(std::is_convertible<U, T>::value, "U must be convertible to T");
             std::fill(_data.begin(), _data.end(), static_cast<T>(value));
         }
+
+        // --- Utilities ---
+        /// Return shape vector (dimensions).
+        const std::vector<size_t>& shape() const noexcept { return _shape; }
+        /// Number of dimensions (rank).
+        size_t rank() const noexcept { return _shape.size(); }
+        /// Total number of elements.
+        size_t size() const noexcept { return _data.size(); }
     };
 
     /**
