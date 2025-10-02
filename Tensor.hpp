@@ -72,7 +72,7 @@ namespace Tensor
          * @return Flat index into the internal storage.
          */
         template<size_t N>
-        size_t computeFlatIndex(const std::array<size_t, N>& indices) const
+        inline size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
             if (N != _strides.size())
                 throw std::invalid_argument("Index rank mismatch");
@@ -117,18 +117,18 @@ namespace Tensor
         /**
          * @brief Mutable element access.
          * @tparam Indices Variadic list of index arguments.
-         * @param indices N-dimensional indices.
+         * @param idxs N-dimensional indices.
          * @return Reference to the element.
          * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
          * @throws std::out_of_range if any index is invalid.
          */
         template<typename... Indices>
-        T& operator()(Indices... indices)
+        T& operator()(Indices... idxs)
         {
-            if (sizeof...(indices) != _shape.size()) 
-                throw std::invalid_argument("Invalid number of indices");
+            if (sizeof...(idxs) != _shape.size()) 
+                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + " indices, got " + std::to_string(sizeof...(idxs)));
 
-            std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
@@ -141,18 +141,18 @@ namespace Tensor
         /**
          * @brief Const element access.
          * @tparam Indices Variadic list of index arguments.
-         * @param indices N-dimensional indices.
+         * @param idxs N-dimensional indices.
          * @return Const reference to the element.
          * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
          * @throws std::out_of_range if any index is invalid.
          */
         template<typename... Indices>
-        const T& operator()(Indices... indices) const
+        const T& operator()(Indices... idxs) const
         {
-            if (sizeof...(indices) != _shape.size()) 
-                throw std::invalid_argument("Invalid number of indices");
+            if (sizeof...(idxs) != _shape.size()) 
+                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + " indices, got " + std::to_string(sizeof...(idxs)));
 
-            std::array<size_t, sizeof...(indices)> idxArr{static_cast<size_t>(indices)...};
+            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
@@ -160,6 +160,13 @@ namespace Tensor
                     throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
             }
             return _data[computeFlatIndex(idxArr)];
+        }
+
+        template<typename... Indicies>
+        inline T& unchecked(Indicies... idxs)
+        {
+            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
+            return _data[computeFlatIndex(idxArr)];            
         }
 
         /// Equality comparison.
@@ -208,25 +215,28 @@ namespace Tensor
          */
         Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
-            throw std::logic_error("matmul() not implemented yet");
+            if (_shape.size() != 2 * otherTensor.shape().size() != 2)
+                throw std::runtime_error("matmul requires matrices (2D tensors).");
+
         }
 
         /**
          * @brief Transpose a rank-2 tensor (matrix).
          * @return New tensor with rows and columns swapped.
-         * @throws std::logic_error if tensor is not 2-dimensional.
+         * @throws std::runtime_error if tensor is not 2-dimensional.
          */
         Tensor<T> transpose() const
         {
             if (_shape.size() != 2)
-                throw std::logic_error("Transposition only supports matrices for now");
+                throw std::runtime_error("Transposition only supports matrices for now");
 
             size_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
 
             for (size_t i = 0; i < rows; ++i)
                 for (size_t j = 0; j < cols; ++j)
-                    result(j, i) = (*this)(i, j);
+                    result._data[result.computeFlatIndex(std::array<size_t, 2>{j, i})] =
+                      this->_data[this->computeFlatIndex(std::array<size_t, 2>{i, j})];
 
             return result;
         }
