@@ -162,8 +162,8 @@ namespace Tensor
             return _data[computeFlatIndex(idxArr)];
         }
 
-        template<typename... Indicies>
-        inline T& unchecked(Indicies... idxs)
+        template<typename... Indices>
+        inline T& unchecked(Indices... idxs)
         {
             std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
             return _data[computeFlatIndex(idxArr)];            
@@ -215,7 +215,7 @@ namespace Tensor
          */
         Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
-            if (_shape.size() != 2 * otherTensor.shape().size() != 2)
+            if (_shape.size() != 2 || otherTensor.shape().size() != 2)
                 throw std::runtime_error("matmul requires matrices (2D tensors).");
 
         }
