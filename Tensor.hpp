@@ -211,23 +211,36 @@ namespace Tensor
             return result;
         }
 
+        Tensor<T> operator+=(const Tensor<T>& otherTensor)
+        {
+            *this = *this + otherTensor;
+            return *this;
+        }
+
+        Tensor<T> operator*=(const Tensor<T>& otherTensor)
+        {
+            *this = *this * otherTensor;
+            return *this;
+        }
+
+
         /**
          * @brief Matrix multiplication. yep, O(n^3).
          * @return New matrix (2nd rank tensor).
          * @throws std::runtime_error if tensor is not 2-dimensional.
          */
-        constexpr Tensor<T> matmul(const Tensor<T>& otherTensor) const
+        Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
             if (_shape.size() != 2 || otherTensor.shape().size() != 2)
                 throw std::runtime_error("matmul requires matrices (2D tensors).");
 
             if (_shape[1] != otherTensor._shape[0])
                 throw std::invalid_argument("matmul dimension mismatch: (" +
-                                            std::to_string(_shape[0]) + "x" + std::to_string(_shape[1]) +
+                                            std::to_string(_shape[0]) + "x" + 
+                                            std::to_string(_shape[1]) +
                                             ") * (" +
                                             std::to_string(otherTensor._shape[0]) + "x" +
                                             std::to_string(otherTensor._shape[1]) + ")");
-
 
             size_t r1 = this->_shape[0];
             size_t c1 = this->_shape[1];
@@ -244,12 +257,9 @@ namespace Tensor
 
                     for (size_t k = 0; k < r2; k++) 
                     {
-                      result._data[computeFlatIndex(
-                          std::array<size_t, 2>{i, j})] +=
-                          otherTensor._data[computeFlatIndex(
-                              std::array<size_t, 2>{k, j})] *
-                          (this->_data[computeFlatIndex(
-                              std::array<size_t, 2>{i, k})]);
+                    result._data[computeFlatIndex(std::array<size_t, 2>{i, j})] +=
+                        otherTensor._data[computeFlatIndex(std::array<size_t, 2>{k, j})] *
+                        this->_data[computeFlatIndex(std::array<size_t, 2>{i, k})];
                     }
                 }
             }
