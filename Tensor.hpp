@@ -72,7 +72,7 @@ namespace Tensor
          * @return Flat index into the internal storage.
          */
         template<size_t N>
-        constexpr size_t computeFlatIndex(const std::array<size_t, N>& indices) const
+        size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
             if (N != _strides.size())
                 throw std::invalid_argument("Index rank mismatch");
@@ -220,6 +220,14 @@ namespace Tensor
         {
             if (_shape.size() != 2 || otherTensor.shape().size() != 2)
                 throw std::runtime_error("matmul requires matrices (2D tensors).");
+
+            if (_shape[1] != otherTensor._shape[0])
+                throw std::invalid_argument("matmul dimension mismatch: (" +
+                                            std::to_string(_shape[0]) + "x" + std::to_string(_shape[1]) +
+                                            ") * (" +
+                                            std::to_string(otherTensor._shape[0]) + "x" +
+                                            std::to_string(otherTensor._shape[1]) + ")");
+
 
             size_t r1 = this->_shape[0];
             size_t c1 = this->_shape[1];
