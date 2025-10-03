@@ -244,22 +244,17 @@ namespace Tensor
 
             size_t r1 = this->_shape[0];
             size_t c1 = this->_shape[1];
-            size_t r2 = otherTensor._shape[0];  
             size_t c2 = otherTensor._shape[1];  
 
             Tensor<T> result({r1, c2});
-
+            result.fill(0);
             for (size_t i = 0; i < r1; i++) 
             {
                 for (size_t j = 0; j < c2; j++) 
                 {
-                    result._data[computeFlatIndex(std::array<size_t, 2>{i, j})] = 0;
-
-                    for (size_t k = 0; k < r2; k++) 
+                    for (size_t k = 0; k < c1; k++) 
                     {
-                    result._data[computeFlatIndex(std::array<size_t, 2>{i, j})] +=
-                        otherTensor._data[computeFlatIndex(std::array<size_t, 2>{k, j})] *
-                        this->_data[computeFlatIndex(std::array<size_t, 2>{i, k})];
+                        result(i, j) += (*this)(i, k) * otherTensor(k, j);
                     }
                 }
             }
