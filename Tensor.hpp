@@ -51,7 +51,7 @@ namespace Tensor
          * @throws std::invalid_argument if shapes do not match.
          */
         template<typename BinaryOp>
-        inline Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
+        constexpr Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
             if (_shape != otherTensor._shape) 
                 throw std::invalid_argument("Tensor shape mismatch");
@@ -72,7 +72,7 @@ namespace Tensor
          * @return Flat index into the internal storage.
          */
         template<size_t N>
-        inline size_t computeFlatIndex(const std::array<size_t, N>& indices) const
+        constexpr size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
             if (N != _strides.size())
                 throw std::invalid_argument("Index rank mismatch");
@@ -126,7 +126,8 @@ namespace Tensor
         T& operator()(Indices... idxs)
         {
             if (sizeof...(idxs) != _shape.size()) 
-                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + " indices, got " + std::to_string(sizeof...(idxs)));
+                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
+                                            " indices, got " + std::to_string(sizeof...(idxs)));
 
             std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
             
@@ -150,7 +151,8 @@ namespace Tensor
         const T& operator()(Indices... idxs) const
         {
             if (sizeof...(idxs) != _shape.size()) 
-                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + " indices, got " + std::to_string(sizeof...(idxs)));
+                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
+                                            " indices, got " + std::to_string(sizeof...(idxs)));
 
             std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
             
@@ -210,14 +212,40 @@ namespace Tensor
         }
 
         /**
-         * @brief Matrix multiplication (not yet implemented).
-         * @throws std::logic_error Always, until implemented.
+         * @brief Matrix multiplication. yep, O(n^3).
+         * @return New matrix (2nd rank tensor).
+         * @throws std::runtime_error if tensor is not 2-dimensional.
          */
-        Tensor<T> matmul(const Tensor<T>& otherTensor) const
+        constexpr Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
             if (_shape.size() != 2 || otherTensor.shape().size() != 2)
                 throw std::runtime_error("matmul requires matrices (2D tensors).");
 
+            size_t r1 = this->_shape[0];
+            size_t c1 = this->_shape[1];
+            size_t r2 = otherTensor._shape[0];  
+            size_t c2 = otherTensor._shape[1];  
+
+            Tensor<T> result({r1, c2});
+
+            for (size_t i = 0; i < r1; i++) 
+            {
+                for (size_t j = 0; j < c2; j++) 
+                {
+                    result._data[computeFlatIndex(std::array<size_t, 2>{i, j})] = 0;
+
+                    for (size_t k = 0; k < r2; k++) 
+                    {
+                      result._data[computeFlatIndex(
+                          std::array<size_t, 2>{i, j})] +=
+                          otherTensor._data[computeFlatIndex(
+                              std::array<size_t, 2>{k, j})] *
+                          (this->_data[computeFlatIndex(
+                              std::array<size_t, 2>{i, k})]);
+                    }
+                }
+            }
+            return result;
         }
 
         /**
