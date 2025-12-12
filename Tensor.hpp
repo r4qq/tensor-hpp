@@ -158,6 +158,7 @@ namespace Tensor
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
+                if (idxArr[i] >= _shape[i])
                     throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
             }
             return _data[computeFlatIndex(idxArr)];
@@ -201,6 +202,14 @@ namespace Tensor
             return elementWiseOp(otherTensor, std::multiplies<T>());
         }
 
+        Tensor<T> operator/(const Tensor<T>& otherTensor) const
+        {
+            if(std::any_of(otherTensor._data.begin(), otherTensor._data.end(), [](const T& val){return val == 0;}))
+                throw std::invalid_argument("Cant divide by 0");
+
+            return elementWiseOp(otherTensor, std::divides<T>());
+        }
+
         /// Scalar multiplication.
         Tensor<T> operator*(const T& scalar) const
         {
@@ -210,18 +219,99 @@ namespace Tensor
             return result;
         }
 
-        Tensor<T> operator+=(const Tensor<T>& otherTensor)
+        /// Scalar division.
+        Tensor<T> operator/(const T& scalar) const
         {
-            *this = *this + otherTensor;
+            if (scalar == 0) 
+                throw std::invalid_argument("Cant divide by 0");
+            
+            Tensor<T> result(_shape);
+            std::transform(_data.begin(), _data.end(), result._data.begin(),
+                           [&scalar](const T& val) { return val / scalar; });
+            return result;
+        }
+
+        Tensor<T>& operator+=(const Tensor<T>& otherTensor)
+        {
+            if (_shape != otherTensor._shape) 
+                throw std::invalid_argument("Tensor shape mismatch");
+
+            std::transform(_data.begin(),
+                           _data.end(),
+                           otherTensor._data.begin(),
+                           _data.begin(),
+                           std::plus<T>());
+
+            return *this;
+            
+        }
+
+        Tensor<T>& operator-=(const Tensor<T>& otherTensor)
+        {
+            if (_shape != otherTensor._shape) 
+                throw std::invalid_argument("Tensor shape mismatch");
+
+            std::transform(_data.begin(),
+                           _data.end(),
+                           otherTensor._data.begin(),
+                           _data.begin(),
+                           std::minus<T>());
+
             return *this;
         }
 
-        Tensor<T> operator*=(const Tensor<T>& otherTensor)
+        Tensor<T>& operator*=(const Tensor<T>& otherTensor)
         {
-            *this = *this * otherTensor;
+            if (_shape != otherTensor._shape) 
+                throw std::invalid_argument("Tensor shape mismatch");
+
+            std::transform(_data.begin(),
+                           _data.end(),
+                           otherTensor._data.begin(),
+                           _data.begin(),
+                           std::multiplies<T>());
+
             return *this;
         }
 
+        Tensor<T>& operator/=(const Tensor<T>& otherTensor)
+        {
+            if (_shape != otherTensor._shape) 
+                throw std::invalid_argument("Tensor shape mismatch");
+
+            if(std::any_of(otherTensor._data.begin(), otherTensor._data.end(), [](const T& val){return val == 0;}))
+                throw std::invalid_argument("Cant divide by 0");
+
+            std::transform(_data.begin(),
+                           _data.end(),
+                           otherTensor._data.begin(),
+                           _data.begin(),
+                           std::divides<T>());
+
+            return *this;
+        }
+
+        Tensor<T>& operator*=(const T& scalar)
+        {
+            std::transform(_data.begin(),
+                           _data.end(),
+                           _data.begin(),
+                           [&scalar](const T& val){return val * scalar;});
+            return *this;
+        }
+
+        Tensor<T>& operator/=(const T& scalar)
+        {
+            if(scalar == 0)
+                throw std::invalid_argument("Cant divide by 0");
+
+            std::transform(_data.begin(),
+                           _data.end(),
+                           _data.begin(),
+                           [&scalar](const T& val){return val / scalar;});
+
+            return *this;
+        }
 
         /**
          * @brief Matrix multiplication. yep, O(n^3).
