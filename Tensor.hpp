@@ -164,6 +164,14 @@ namespace Tensor
             return _data[computeFlatIndex(idxArr)];
         }
 
+        /**
+        * @brief Fast unchecked element access.
+        * @tparam Indices Variadic list of index arguments.
+        * @param idxs N-dimensional indices.
+        * @return Reference to the selected element.
+        *
+        * @note Out-of-range indices result in undefined behavior.
+        */
         template<typename... Indices>
         inline T& unchecked(Indices... idxs)
         {
@@ -171,37 +179,66 @@ namespace Tensor
             return _data[computeFlatIndex(idxArr)];            
         }
 
-        /// Equality comparison.
+        /**
+        * @brief Compare two tensors for equality.
+        * @param otherTensor The tensor to compare with.
+        * @return true if shapes and data match exactly, false otherwise.
+        */
         bool operator==(const Tensor<T>& otherTensor) const
         {
             return _shape == otherTensor._shape &&
                    _data == otherTensor._data;
         }
 
-        /// Inequality comparison.
+        /**
+        * @brief Compare two tensors for inequality.
+        * @param otherTensor The tensor to compare with.
+        * @return true if tensors differ, false otherwise.
+        */
         bool operator!=(const Tensor<T>& otherTensor) const
         {
             return !(*this == otherTensor);
         }
 
-        /// Element-wise addition.
+        /**
+        * @brief Element-wise addition.
+        * @param otherTensor Tensor to add.
+        * @return Resulting tensor after element-wise addition.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T> operator+(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::plus<T>());
         }
 
-        /// Element-wise subtraction.
+        /**
+        * @brief Element-wise subtraction.
+        * @param otherTensor Tensor to subtract.
+        * @return New tensor containing element-wise differences.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T> operator-(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::minus<T>());
         }
 
-        /// Element-wise multiplication.
+        /**
+        * @brief Element-wise multiplication.
+        * @param otherTensor Tensor to multiply with.
+        * @return Tensor containing element-wise products.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T> operator*(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::multiplies<T>());
         }
 
+        /**
+        * @brief Element-wise division.
+        * @param otherTensor Tensor providing divisors.
+        * @return Tensor containing element-wise quotients.
+        * @throws std::invalid_argument if shapes differ or any divisor is zero.
+        */
         Tensor<T> operator/(const Tensor<T>& otherTensor) const
         {
             if(std::any_of(otherTensor._data.begin(), otherTensor._data.end(), [](const T& val){return val == 0;}))
@@ -210,7 +247,11 @@ namespace Tensor
             return elementWiseOp(otherTensor, std::divides<T>());
         }
 
-        /// Scalar multiplication.
+        /**
+        * @brief Multiply all elements by a scalar.
+        * @param scalar Scalar multiplier.
+        * @return New tensor after scalar multiplication.
+        */
         Tensor<T> operator*(const T& scalar) const
         {
             Tensor<T> result(_shape);
@@ -219,7 +260,12 @@ namespace Tensor
             return result;
         }
 
-        /// Scalar division.
+        /**
+        * @brief Divide all elements by a scalar.
+        * @param scalar Divisor.
+        * @return New tensor after scalar division.
+        * @throws std::invalid_argument if scalar is zero.
+        */
         Tensor<T> operator/(const T& scalar) const
         {
             if (scalar == 0) 
@@ -231,6 +277,12 @@ namespace Tensor
             return result;
         }
 
+        /**
+        * @brief In-place element-wise addition.
+        * @param otherTensor Tensor to add.
+        * @return Reference to this tensor.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T>& operator+=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -245,7 +297,13 @@ namespace Tensor
             return *this;
             
         }
-
+        
+        /**
+        * @brief In-place element-wise subtraction.
+        * @param otherTensor Tensor to subtract.
+        * @return Reference to this tensor.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T>& operator-=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -260,6 +318,12 @@ namespace Tensor
             return *this;
         }
 
+        /**
+        * @brief In-place element-wise multiplication.
+        * @param otherTensor Tensor to multiply with.
+        * @return Reference to this tensor.
+        * @throws std::invalid_argument if shapes do not match.
+        */
         Tensor<T>& operator*=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -274,6 +338,12 @@ namespace Tensor
             return *this;
         }
 
+        /**
+        * @brief In-place element-wise division.
+        * @param otherTensor Tensor providing divisors.
+        * @return Reference to this tensor.
+        * @throws std::invalid_argument if shapes differ or any divisor is zero.
+        */
         Tensor<T>& operator/=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -291,6 +361,11 @@ namespace Tensor
             return *this;
         }
 
+        /**
+        * @brief In-place scalar multiplication.
+        * @param scalar Multiplier.
+        * @return Reference to this tensor.
+        */
         Tensor<T>& operator*=(const T& scalar)
         {
             std::transform(_data.begin(),
@@ -300,6 +375,12 @@ namespace Tensor
             return *this;
         }
 
+        /**
+        * @brief In-place scalar division.
+        * @param scalar Divisor.
+        * @return Reference to this tensor.
+        * @throws std::invalid_argument if scalar is zero.
+        */
         Tensor<T>& operator/=(const T& scalar)
         {
             if(scalar == 0)
@@ -384,11 +465,22 @@ namespace Tensor
         }
 
         // --- Utilities ---
-        /// Return shape vector (dimensions).
+
+        /**
+        * @brief Get the tensor's shape.
+        * @return Vector of dimension sizes.
+        */
         const std::vector<size_t>& shape() const noexcept { return _shape; }
-        /// Number of dimensions (rank).
+
+        /**
+        * @brief Get the number of dimensions.
+        * @return Tensor rank.
+        */
         size_t rank() const noexcept { return _shape.size(); }
-        /// Total number of elements.
+        /**
+        * @brief Get total number of stored elements.
+        * @return Element count.
+        */
         size_t size() const noexcept { return _data.size(); }
     };
 
