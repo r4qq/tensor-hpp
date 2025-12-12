@@ -158,7 +158,6 @@ namespace Tensor
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
-                if (idxArr[i] >= _shape[i])
                     throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
             }
             return _data[computeFlatIndex(idxArr)];
