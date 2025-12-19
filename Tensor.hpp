@@ -53,8 +53,10 @@ namespace Tensor
         template<typename BinaryOp>
         constexpr Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
-            if (_shape != otherTensor._shape) 
+            if (_shape != otherTensor._shape)
+            {
                 throw std::invalid_argument("Tensor shape mismatch");
+            }
 
             Tensor<T> result(_shape);
             std::transform(_data.begin(),
@@ -75,7 +77,9 @@ namespace Tensor
         size_t computeFlatIndex(const std::array<size_t, N>& indices) const
         {
             if (N != _strides.size())
+            {
                 throw std::invalid_argument("Index rank mismatch");
+            }
             
             return std::inner_product(_strides.begin(),
                                       _strides.end(),
@@ -93,8 +97,10 @@ namespace Tensor
         template<typename I>
         size_t safeCastIndex(I idx) const
         {
-            if(std::is_signed<I>::value && idx < 0)
-                throw std::out_of_range("Index can't be negative" + std::to_string((idx)));
+            if (std::is_signed<I>::value && idx < 0)
+            {
+                throw std::out_of_range("Index can't be negative: " + std::to_string(idx));
+            }
 
             return static_cast<size_t>(idx);
         }
@@ -110,18 +116,24 @@ namespace Tensor
               _strides(_shape.size(), 1)
         {
             if (_shape.empty())
-                throw std::invalid_argument("Shape must be greater than 0");
+            {
+                throw std::invalid_argument("Shape must have at least one dimension");
+            }
             
-                // Compute strides (row-major order)
+            // Compute strides (row-major order)
             for (size_t i = _shape.size(); i-- > 1; )
+            {
                 _strides[i - 1] = _strides[i] * _shape[i];
+            }
 
             // Compute total size
             size_t totalSize = 1;
             for (size_t dim : _shape)
             {
                 if (dim == 0)
+                {
                     throw std::invalid_argument("Shape dimensions must be greater than 0");
+                }
                 totalSize *= dim;
             }
 
@@ -143,15 +155,19 @@ namespace Tensor
         T& operator()(Indices... idxs)
         {
             if (sizeof...(idxs) != _shape.size()) 
+            {
                 throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
                                             " indices, got " + std::to_string(sizeof...(idxs)));
+            }
 
             std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
                 if (idxArr[i] >= _shape[i])
+                {
                     throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
+                }
             }
             return _data[computeFlatIndex(idxArr)];
         }
@@ -168,15 +184,19 @@ namespace Tensor
         const T& operator()(Indices... idxs) const
         {
             if (sizeof...(idxs) != _shape.size()) 
+            {
                 throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
                                             " indices, got " + std::to_string(sizeof...(idxs)));
+            }
 
             std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
                 if (idxArr[i] >= _shape[i])
+                {
                     throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
+                }
             }
             return _data[computeFlatIndex(idxArr)];
         }
@@ -258,9 +278,11 @@ namespace Tensor
         */
         Tensor<T> operator/(const Tensor<T>& otherTensor) const
         {
-            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
+            if (_shape != otherTensor._shape) 
+            { 
+                throw std::invalid_argument("Tensor shape mismatch"); 
+            }
 
-            //Compile-time branching? HELL YEAH XDDDDD
             if constexpr (std::is_floating_point<T>::value) 
             {
                 return elementWiseOp(otherTensor, std::divides<T>());    
@@ -269,7 +291,10 @@ namespace Tensor
             {
                 for (const auto& val : otherTensor._data) 
                 {
-                    if (val == 0 ) {throw std::invalid_argument("Can't divide by 0");}                    
+                    if (val == 0) 
+                    {
+                        throw std::invalid_argument("Can't divide by 0");
+                    }                    
                 }
 
                 return elementWiseOp(otherTensor, std::divides<T>());
@@ -284,7 +309,9 @@ namespace Tensor
         Tensor<T> operator*(const T& scalar) const
         {
             Tensor<T> result(_shape);
-            std::transform(_data.begin(), _data.end(), result._data.begin(),
+            std::transform(_data.begin(), 
+                           _data.end(), 
+                           result._data.begin(),
                            [&scalar](const T& val) { return val * scalar; });
             return result;
         }
@@ -297,10 +324,15 @@ namespace Tensor
         */
         Tensor<T> operator/(const T& scalar) const
         {
-            if (scalar == 0) { throw std::invalid_argument("Cant divide by 0"); }
+            if (scalar == 0) 
+            { 
+                throw std::invalid_argument("Can't divide by 0"); 
+            }
             
             Tensor<T> result(_shape);
-            std::transform(_data.begin(), _data.end(), result._data.begin(),
+            std::transform(_data.begin(), 
+                           _data.end(), 
+                           result._data.begin(),
                            [&scalar](const T& val) { return val / scalar; });
             return result;
         }
@@ -313,7 +345,10 @@ namespace Tensor
         */
         Tensor<T>& operator+=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
+            if (_shape != otherTensor._shape) 
+            { 
+                throw std::invalid_argument("Tensor shape mismatch"); 
+            }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -322,7 +357,6 @@ namespace Tensor
                            std::plus<T>());
 
             return *this;
-            
         }
         
         /**
@@ -333,7 +367,10 @@ namespace Tensor
         */
         Tensor<T>& operator-=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
+            if (_shape != otherTensor._shape) 
+            { 
+                throw std::invalid_argument("Tensor shape mismatch"); 
+            }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -352,7 +389,10 @@ namespace Tensor
         */
         Tensor<T>& operator*=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
+            if (_shape != otherTensor._shape) 
+            { 
+                throw std::invalid_argument("Tensor shape mismatch"); 
+            }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -371,9 +411,11 @@ namespace Tensor
         */
         Tensor<T>& operator/=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
+            if (_shape != otherTensor._shape) 
+            { 
+                throw std::invalid_argument("Tensor shape mismatch"); 
+            }
 
-            //More compile-time branching? HELL YEAH XDDDDD
             if constexpr (std::is_floating_point<T>::value) 
             {
                 std::transform(_data.begin(), 
@@ -386,7 +428,10 @@ namespace Tensor
             {
                 for (const auto& val : otherTensor._data) 
                 {
-                    if (val == 0 ) {throw std::invalid_argument("Can't divide by 0");}                    
+                    if (val == 0) 
+                    {
+                        throw std::invalid_argument("Can't divide by 0");
+                    }                    
                 }
 
                 std::transform(_data.begin(), 
@@ -409,7 +454,7 @@ namespace Tensor
             std::transform(_data.begin(),
                            _data.end(),
                            _data.begin(),
-                           [&scalar](const T& val){return val * scalar;});
+                           [&scalar](const T& val){ return val * scalar; });
             return *this;
         }
 
@@ -421,12 +466,15 @@ namespace Tensor
         */
         Tensor<T>& operator/=(const T& scalar)
         {
-            if(scalar == 0) { throw std::invalid_argument("Cant divide by 0"); }
+            if (scalar == 0) 
+            { 
+                throw std::invalid_argument("Can't divide by 0"); 
+            }
 
             std::transform(_data.begin(),
                            _data.end(),
                            _data.begin(),
-                           [&scalar](const T& val){return val / scalar;});
+                           [&scalar](const T& val){ return val / scalar; });
 
             return *this;
         }
@@ -438,7 +486,10 @@ namespace Tensor
          */
         Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
-            if (_shape.size() != 2 || otherTensor.shape().size() != 2) { throw std::runtime_error("matmul requires matrices (2D tensors)."); }
+            if (_shape.size() != 2 || otherTensor.shape().size() != 2) 
+            { 
+                throw std::runtime_error("matmul requires matrices (2D tensors)."); 
+            }
 
             if (_shape[1] != otherTensor._shape[0])
             {
@@ -476,15 +527,22 @@ namespace Tensor
          */
         Tensor<T> transpose() const
         {
-            if (_shape.size() != 2) { throw std::runtime_error("Transposition only supports matrices for now"); }
+            if (_shape.size() != 2) 
+            { 
+                throw std::runtime_error("Transposition only supports matrices for now"); 
+            }
 
             size_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
 
             for (size_t i = 0; i < rows; ++i)
+            {
                 for (size_t j = 0; j < cols; ++j)
+                {
                     result._data[result.computeFlatIndex(std::array<size_t, 2>{j, i})] =
                       this->_data[this->computeFlatIndex(std::array<size_t, 2>{i, j})];
+                }
+            }
 
             return result;
         }
