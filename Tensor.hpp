@@ -377,7 +377,7 @@ namespace Tensor
             if constexpr (std::is_floating_point<T>::value) 
             {
                 std::transform(_data.begin(), 
-                               _data.end, 
+                               _data.end(), 
                                otherTensor._data.begin(), 
                                _data.begin(), 
                                std::divides<T>());
@@ -390,7 +390,7 @@ namespace Tensor
                 }
 
                 std::transform(_data.begin(), 
-                               _data.end, 
+                               _data.end(), 
                                otherTensor._data.begin(), 
                                _data.begin(), 
                                std::divides<T>());
