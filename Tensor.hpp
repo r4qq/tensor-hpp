@@ -83,6 +83,22 @@ namespace Tensor
                                       size_t(0));
         }
 
+        /**
+         * @brief Safely casts an arbitrary integer type to size_t.
+         * @tparam I Input integer type.
+         * @param idx The index value to cast.
+         * @return The value cast to size_t.
+         * @throws std::out_of_range if idx is negative (only for signed types).
+         */
+        template<typename I>
+        size_t safeCastIndex(I idx) const
+        {
+            if(std::is_signed<I>::value && idx < 0)
+                throw std::out_of_range("Index can't be negative" + std::to_string((idx)));
+
+            return static_cast<size_t>(idx);
+        }
+
     public:
         /**
          * @brief Construct a tensor of given shape with default-initialized elements.
@@ -93,11 +109,12 @@ namespace Tensor
             : _shape(std::move(shape)),
               _strides(_shape.size(), 1)
         {
-            // Compute strides (row-major order)
+            if (_shape.empty())
+                throw std::invalid_argument("Shape must be greater than 0");
+            
+                // Compute strides (row-major order)
             for (size_t i = _shape.size(); i-- > 1; )
-            {
                 _strides[i - 1] = _strides[i] * _shape[i];
-            }
 
             // Compute total size
             size_t totalSize = 1;
@@ -129,7 +146,7 @@ namespace Tensor
                 throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
                                             " indices, got " + std::to_string(sizeof...(idxs)));
 
-            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
+            std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
@@ -154,7 +171,7 @@ namespace Tensor
                 throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
                                             " indices, got " + std::to_string(sizeof...(idxs)));
 
-            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
+            std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
             
             for (size_t i = 0; i < _shape.size(); i++)
             {
@@ -349,14 +366,17 @@ namespace Tensor
             if (_shape != otherTensor._shape) 
                 throw std::invalid_argument("Tensor shape mismatch");
 
-            if(std::any_of(otherTensor._data.begin(), otherTensor._data.end(), [](const T& val){return val == 0;}))
-                throw std::invalid_argument("Cant divide by 0");
+            
 
             std::transform(_data.begin(),
                            _data.end(),
                            otherTensor._data.begin(),
                            _data.begin(),
-                           std::divides<T>());
+                           [](const T& val1, const T& val2){
+                                if(val2 == 0)
+                                    throw std::invalid_argument("Cant't idive by 0");
+                                return val1 / val2;
+                           });
 
             return *this;
         }
