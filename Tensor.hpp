@@ -258,10 +258,22 @@ namespace Tensor
         */
         Tensor<T> operator/(const Tensor<T>& otherTensor) const
         {
-            if(std::any_of(otherTensor._data.begin(), otherTensor._data.end(), [](const T& val){return val == 0;}))
-                throw std::invalid_argument("Cant divide by 0");
+            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
 
-            return elementWiseOp(otherTensor, std::divides<T>());
+            //Compile-time branching? HELL YEAH XDDDDD
+            if constexpr (std::is_floating_point<T>::value) 
+            {
+                return elementWiseOp(otherTensor, std::divides<T>());    
+            }
+            else            
+            {
+                for (const auto& val : otherTensor._data) 
+                {
+                    if (val == 0 ) {throw std::invalid_argument("Can't divide by 0");}                    
+                }
+
+                return elementWiseOp(otherTensor, std::divides<T>());
+            }
         }
 
         /**
@@ -285,8 +297,7 @@ namespace Tensor
         */
         Tensor<T> operator/(const T& scalar) const
         {
-            if (scalar == 0) 
-                throw std::invalid_argument("Cant divide by 0");
+            if (scalar == 0) { throw std::invalid_argument("Cant divide by 0"); }
             
             Tensor<T> result(_shape);
             std::transform(_data.begin(), _data.end(), result._data.begin(),
@@ -302,8 +313,7 @@ namespace Tensor
         */
         Tensor<T>& operator+=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) 
-                throw std::invalid_argument("Tensor shape mismatch");
+            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -323,8 +333,7 @@ namespace Tensor
         */
         Tensor<T>& operator-=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) 
-                throw std::invalid_argument("Tensor shape mismatch");
+            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -343,8 +352,7 @@ namespace Tensor
         */
         Tensor<T>& operator*=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) 
-                throw std::invalid_argument("Tensor shape mismatch");
+            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -363,20 +371,30 @@ namespace Tensor
         */
         Tensor<T>& operator/=(const Tensor<T>& otherTensor)
         {
-            if (_shape != otherTensor._shape) 
-                throw std::invalid_argument("Tensor shape mismatch");
+            if (_shape != otherTensor._shape) { throw std::invalid_argument("Tensor shape mismatch"); }
 
-            
+            //More compile-time branching? HELL YEAH XDDDDD
+            if constexpr (std::is_floating_point<T>::value) 
+            {
+                std::transform(_data.begin(), 
+                               _data.end, 
+                               otherTensor._data.begin(), 
+                               _data.begin(), 
+                               std::divides<T>());
+            }
+            else            
+            {
+                for (const auto& val : otherTensor._data) 
+                {
+                    if (val == 0 ) {throw std::invalid_argument("Can't divide by 0");}                    
+                }
 
-            std::transform(_data.begin(),
-                           _data.end(),
-                           otherTensor._data.begin(),
-                           _data.begin(),
-                           [](const T& val1, const T& val2){
-                                if(val2 == 0)
-                                    throw std::invalid_argument("Cant't idive by 0");
-                                return val1 / val2;
-                           });
+                std::transform(_data.begin(), 
+                               _data.end, 
+                               otherTensor._data.begin(), 
+                               _data.begin(), 
+                               std::divides<T>());
+            }
 
             return *this;
         }
@@ -403,8 +421,7 @@ namespace Tensor
         */
         Tensor<T>& operator/=(const T& scalar)
         {
-            if(scalar == 0)
-                throw std::invalid_argument("Cant divide by 0");
+            if(scalar == 0) { throw std::invalid_argument("Cant divide by 0"); }
 
             std::transform(_data.begin(),
                            _data.end(),
@@ -421,16 +438,17 @@ namespace Tensor
          */
         Tensor<T> matmul(const Tensor<T>& otherTensor) const
         {
-            if (_shape.size() != 2 || otherTensor.shape().size() != 2)
-                throw std::runtime_error("matmul requires matrices (2D tensors).");
+            if (_shape.size() != 2 || otherTensor.shape().size() != 2) { throw std::runtime_error("matmul requires matrices (2D tensors)."); }
 
             if (_shape[1] != otherTensor._shape[0])
+            {
                 throw std::invalid_argument("matmul dimension mismatch: (" +
                                             std::to_string(_shape[0]) + "x" + 
                                             std::to_string(_shape[1]) +
                                             ") * (" +
                                             std::to_string(otherTensor._shape[0]) + "x" +
                                             std::to_string(otherTensor._shape[1]) + ")");
+            }
 
             size_t r1 = this->_shape[0];
             size_t c1 = this->_shape[1];
@@ -458,8 +476,7 @@ namespace Tensor
          */
         Tensor<T> transpose() const
         {
-            if (_shape.size() != 2)
-                throw std::runtime_error("Transposition only supports matrices for now");
+            if (_shape.size() != 2) { throw std::runtime_error("Transposition only supports matrices for now"); }
 
             size_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
