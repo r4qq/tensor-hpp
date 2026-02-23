@@ -476,7 +476,7 @@ namespace Tensor
                 {
                     for (size_t k = 0; k < c1; k++) 
                     {
-                        result(i, j) += (*this)(i, k) * otherTensor(k, j);
+                        result.unchecked(i, j) += this->unchecked(i, k) * otherTensor.unchecked(k, j);
                     }
                 }
             }
