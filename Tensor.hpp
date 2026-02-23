@@ -11,7 +11,6 @@
 #include <array>
 #include <cstddef>
 #include <functional>
-#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -67,42 +66,19 @@ namespace Tensor
             return result;
         }
 
-        /**
-         * @brief Compute the flat index from N-dimensional indices.
-         * @tparam N Number of dimensions.
-         * @param indices N-dimensional index array.
-         * @return Flat index into the internal storage.
-         */
-        template<size_t N>
-        size_t computeFlatIndex(const std::array<size_t, N>& indices) const
+        template<std::size_t... I, typename... Indiecies>
+        inline size_t computeFlatUnrolled(std::index_sequence<I...>, Indiecies... idxs) const
         {
-            if (N != _strides.size())
-            {
-                throw std::invalid_argument("Index rank mismatch");
-            }
-            
-            return std::inner_product(_strides.begin(),
-                                      _strides.end(),
-                                      indices.begin(),
-                                      size_t(0));
+            return ((static_cast<size_t>(idxs) * _strides[I]) + ...);
         }
 
-        /**
-         * @brief Safely casts an arbitrary integer type to size_t.
-         * @tparam I Input integer type.
-         * @param idx The index value to cast.
-         * @return The value cast to size_t.
-         * @throws std::out_of_range if idx is negative (only for signed types).
-         */
-        template<typename I>
-        size_t safeCastIndex(I idx) const
+        template<std::size_t... I, typename... Indiecies>
+        inline void checkBoundsUnrolled(std::index_sequence<I...>, Indiecies... idxs) const
         {
-            if (std::is_signed<I>::value && idx < 0)
+            if ((... || (static_cast<size_t>(idxs) >= _shape[I]))) 
             {
-                throw std::out_of_range("Index can't be negative: " + std::to_string(idx));
+                throw std::out_of_range("Index out of range");
             }
-
-            return static_cast<size_t>(idx);
         }
 
     public:
@@ -156,20 +132,11 @@ namespace Tensor
         {
             if (sizeof...(idxs) != _shape.size()) 
             {
-                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
-                                            " indices, got " + std::to_string(sizeof...(idxs)));
+                throw std::invalid_argument("Rank mismatch");
             }
 
-            std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
-            
-            for (size_t i = 0; i < _shape.size(); i++)
-            {
-                if (idxArr[i] >= _shape[i])
-                {
-                    throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
-                }
-            }
-            return _data[computeFlatIndex(idxArr)];
+            checkBoundsUnrolled(std::index_sequence_for<Indices...>{}, idxs...);
+            return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)];
         }
 
         /**
@@ -185,20 +152,11 @@ namespace Tensor
         {
             if (sizeof...(idxs) != _shape.size()) 
             {
-                throw std::invalid_argument("Expected " + std::to_string(_shape.size()) + 
-                                            " indices, got " + std::to_string(sizeof...(idxs)));
+                throw std::invalid_argument("Rank mismatch");
             }
 
-            std::array<size_t, sizeof...(idxs)> idxArr{safeCastIndex(idxs)...};
-            
-            for (size_t i = 0; i < _shape.size(); i++)
-            {
-                if (idxArr[i] >= _shape[i])
-                {
-                    throw std::out_of_range("Index " + std::to_string(idxArr[i]) + " is out of range");
-                }
-            }
-            return _data[computeFlatIndex(idxArr)];
+            checkBoundsUnrolled(std::index_sequence_for<Indices...>{}, idxs...);
+            return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)];
         }
 
         /**
@@ -212,8 +170,13 @@ namespace Tensor
         template<typename... Indices>
         inline T& unchecked(Indices... idxs)
         {
-            std::array<size_t, sizeof...(idxs)> idxArr{static_cast<size_t>(idxs)...};
-            return _data[computeFlatIndex(idxArr)];            
+            return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)] ;          
+        }
+
+        template<typename... Indices>
+        inline const T& unchecked(Indices... idxs) const
+        {
+            return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)] ;          
         }
 
         /**
@@ -525,6 +488,11 @@ namespace Tensor
          * @return New tensor with rows and columns swapped.
          * @throws std::runtime_error if tensor is not 2-dimensional.
          */
+        /**
+         * @brief Transpose a rank-2 tensor (matrix).
+         * @return New tensor with rows and columns swapped.
+         * @throws std::runtime_error if tensor is not 2-dimensional.
+         */
         Tensor<T> transpose() const
         {
             if (_shape.size() != 2) 
@@ -539,8 +507,7 @@ namespace Tensor
             {
                 for (size_t j = 0; j < cols; ++j)
                 {
-                    result._data[result.computeFlatIndex(std::array<size_t, 2>{j, i})] =
-                      this->_data[this->computeFlatIndex(std::array<size_t, 2>{i, j})];
+                    result.unchecked(j, i) = this->unchecked(i, j);
                 }
             }
 
