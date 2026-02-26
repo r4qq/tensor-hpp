@@ -8,11 +8,9 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <functional>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -50,7 +48,7 @@ namespace Tensor
          * @throws std::invalid_argument if shapes do not match.
          */
         template<typename BinaryOp>
-        constexpr Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
+        Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
             if (_shape != otherTensor._shape)
             {
@@ -66,14 +64,28 @@ namespace Tensor
             return result;
         }
 
-        template<std::size_t... I, typename... Indiecies>
-        inline size_t computeFlatUnrolled(std::index_sequence<I...>, Indiecies... idxs) const
+        /**
+         * @brief Compute the flattened (linear) index from N-dimensional indices.
+         * @tparam I Compile-time index sequence corresponding to tensor dimensions.
+         * @tparam Indices Variadic index argument types.
+         * @param idxs N-dimensional indices.
+         * @return Flattened index into the underlying contiguous storage.
+         */
+        template<std::size_t... I, typename... Indices>
+        inline size_t computeFlatUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
             return ((static_cast<size_t>(idxs) * _strides[I]) + ...);
         }
 
-        template<std::size_t... I, typename... Indiecies>
-        inline void checkBoundsUnrolled(std::index_sequence<I...>, Indiecies... idxs) const
+         /**
+         * @brief Validate N-dimensional indices against tensor bounds.
+         * @tparam I Compile-time index sequence corresponding to tensor dimensions.
+         * @tparam Indices Variadic index argument types.
+         * @param idxs N-dimensional indices.
+         * @throws std::out_of_range if any index exceeds its dimension bounds.
+         */
+        template<std::size_t... I, typename... Indices>
+        inline void checkBoundsUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
             if ((... || (static_cast<size_t>(idxs) >= _shape[I]))) 
             {
@@ -184,7 +196,7 @@ namespace Tensor
         * @param otherTensor The tensor to compare with.
         * @return true if shapes and data match exactly, false otherwise.
         */
-        bool operator==(const Tensor<T>& otherTensor) const
+        bool operator==(const Tensor<T>& otherTensor) const noexcept
         {
             return _shape == otherTensor._shape &&
                    _data == otherTensor._data;
@@ -195,7 +207,7 @@ namespace Tensor
         * @param otherTensor The tensor to compare with.
         * @return true if tensors differ, false otherwise.
         */
-        bool operator!=(const Tensor<T>& otherTensor) const
+        bool operator!=(const Tensor<T>& otherTensor) const noexcept
         {
             return !(*this == otherTensor);
         }
@@ -456,12 +468,7 @@ namespace Tensor
 
             if (_shape[1] != otherTensor._shape[0])
             {
-                throw std::invalid_argument("matmul dimension mismatch: (" +
-                                            std::to_string(_shape[0]) + "x" + 
-                                            std::to_string(_shape[1]) +
-                                            ") * (" +
-                                            std::to_string(otherTensor._shape[0]) + "x" +
-                                            std::to_string(otherTensor._shape[1]) + ")");
+                throw std::invalid_argument("matmul dimension mismatch");
             }
 
             size_t r1 = this->_shape[0];
@@ -470,24 +477,26 @@ namespace Tensor
 
             Tensor<T> result({r1, c2});
             result.fill(0);
-            for (size_t i = 0; i < r1; i++) 
+            
+            const T* aPtr = this->data();
+            const T* bPtr = otherTensor.data();
+            T* cPtr = result.data();
+
+            for (size_t i = 0; i < r1; ++i) 
             {
-                for (size_t j = 0; j < c2; j++) 
+                for (size_t k = 0; k < c1; ++k) 
                 {
-                    for (size_t k = 0; k < c1; k++) 
+                    T a_ik = aPtr[i * c1 + k]; 
+                    
+                    for (size_t j = 0; j < c2; ++j) 
                     {
-                        result.unchecked(i, j) += this->unchecked(i, k) * otherTensor.unchecked(k, j);
+                        cPtr[i * c2 + j] += a_ik * bPtr[k * c2 + j];
                     }
                 }
             }
             return result;
         }
 
-        /**
-         * @brief Transpose a rank-2 tensor (matrix).
-         * @return New tensor with rows and columns swapped.
-         * @throws std::runtime_error if tensor is not 2-dimensional.
-         */
         /**
          * @brief Transpose a rank-2 tensor (matrix).
          * @return New tensor with rows and columns swapped.
@@ -539,11 +548,24 @@ namespace Tensor
         * @return Tensor rank.
         */
         size_t rank() const noexcept { return _shape.size(); }
+        
         /**
         * @brief Get total number of stored elements.
         * @return Element count.
         */
         size_t size() const noexcept { return _data.size(); }
+
+        /**
+         * @brief Get a pointer to the underlying contiguous data storage.
+         * @return Pointer to the first element in the tensor.
+         */
+        T* data() noexcept { return _data.data(); }
+        
+        /**
+         * @brief Get a const pointer to the underlying contiguous data storage.
+         * @return Const pointer to the first element in the tensor.
+         */
+        const T* data() const noexcept { return _data.data(); }
     };
 
     /**
