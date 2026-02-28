@@ -9,11 +9,14 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+
 
 namespace Tensor
 {
@@ -35,8 +38,8 @@ namespace Tensor
         static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
 
     private:
-        std::vector<size_t> _shape;       ///< Dimensions of the tensor.
-        std::vector<size_t> _strides;     ///< Stride values for flat indexing.
+        std::vector<uint64_t> _shape;       ///< Dimensions of the tensor.
+        std::vector<uint64_t> _strides;     ///< Stride values for flat indexing.
         std::vector<T> _data;             ///< Contiguous storage for tensor data.
 
         /**
@@ -71,10 +74,10 @@ namespace Tensor
          * @param idxs N-dimensional indices.
          * @return Flattened index into the underlying contiguous storage.
          */
-        template<std::size_t... I, typename... Indices>
-        inline size_t computeFlatUnrolled(std::index_sequence<I...>, Indices... idxs) const
+        template<std::uint64_t... I, typename... Indices>
+        inline uint64_t computeFlatUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
-            return ((static_cast<size_t>(idxs) * _strides[I]) + ...);
+            return ((static_cast<uint64_t>(idxs) * _strides[I]) + ...);
         }
 
          /**
@@ -84,10 +87,10 @@ namespace Tensor
          * @param idxs N-dimensional indices.
          * @throws std::out_of_range if any index exceeds its dimension bounds.
          */
-        template<std::size_t... I, typename... Indices>
+        template<std::uint64_t... I, typename... Indices>
         inline void checkBoundsUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
-            if ((... || (static_cast<size_t>(idxs) >= _shape[I]))) 
+            if ((... || (static_cast<uint64_t>(idxs) >= _shape[I]))) 
             {
                 throw std::out_of_range("Index out of range");
             }
@@ -99,7 +102,7 @@ namespace Tensor
          * @param shape Vector specifying the size of each dimension.
          * @throws std::invalid_argument if any dimension is zero.
          */
-        Tensor(std::vector<size_t> shape)
+        Tensor(std::vector<uint64_t> shape)
             : _shape(std::move(shape)),
               _strides(_shape.size(), 1)
         {
@@ -109,14 +112,14 @@ namespace Tensor
             }
             
             // Compute strides (row-major order)
-            for (size_t i = _shape.size(); i-- > 1; )
+            for (uint64_t i = _shape.size(); i-- > 1; )
             {
                 _strides[i - 1] = _strides[i] * _shape[i];
             }
 
             // Compute total size
-            size_t totalSize = 1;
-            for (size_t dim : _shape)
+            uint64_t totalSize = 1;
+            for (uint64_t dim : _shape)
             {
                 if (dim == 0)
                 {
@@ -471,9 +474,9 @@ namespace Tensor
                 throw std::invalid_argument("matmul dimension mismatch");
             }
 
-            size_t r1 = this->_shape[0];
-            size_t c1 = this->_shape[1];
-            size_t c2 = otherTensor._shape[1];  
+            uint64_t r1 = this->_shape[0];
+            uint64_t c1 = this->_shape[1];
+            uint64_t c2 = otherTensor._shape[1];  
 
             Tensor<T> result({r1, c2});
             result.fill(0);
@@ -482,13 +485,13 @@ namespace Tensor
             const T* bPtr = otherTensor.data();
             T* cPtr = result.data();
 
-            for (size_t i = 0; i < r1; ++i) 
+            for (uint64_t i = 0; i < r1; ++i) 
             {
-                for (size_t k = 0; k < c1; ++k) 
+                for (uint64_t k = 0; k < c1; ++k) 
                 {
                     T a_ik = aPtr[i * c1 + k]; 
                     
-                    for (size_t j = 0; j < c2; ++j) 
+                    for (uint64_t j = 0; j < c2; ++j) 
                     {
                         cPtr[i * c2 + j] += a_ik * bPtr[k * c2 + j];
                     }
@@ -509,12 +512,12 @@ namespace Tensor
                 throw std::runtime_error("Transposition only supports matrices for now"); 
             }
 
-            size_t rows = _shape[0], cols = _shape[1];
+            uint64_t rows = _shape[0], cols = _shape[1];
             Tensor<T> result({cols, rows});
 
-            for (size_t i = 0; i < rows; ++i)
+            for (uint64_t i = 0; i < rows; ++i)
             {
-                for (size_t j = 0; j < cols; ++j)
+                for (uint64_t j = 0; j < cols; ++j)
                 {
                     result.unchecked(j, i) = this->unchecked(i, j);
                 }
@@ -541,19 +544,19 @@ namespace Tensor
         * @brief Get the tensor's shape.
         * @return Vector of dimension sizes.
         */
-        const std::vector<size_t>& shape() const noexcept { return _shape; }
+        const std::vector<uint64_t>& shape() const noexcept { return _shape; }
 
         /**
         * @brief Get the number of dimensions.
         * @return Tensor rank.
         */
-        size_t rank() const noexcept { return _shape.size(); }
+        uint64_t rank() const noexcept { return _shape.size(); }
         
         /**
         * @brief Get total number of stored elements.
         * @return Element count.
         */
-        size_t size() const noexcept { return _data.size(); }
+        uint64_t size() const noexcept { return _data.size(); }
 
         /**
          * @brief Get a pointer to the underlying contiguous data storage.
