@@ -2,13 +2,12 @@
  * @file Tensor.hpp
  * @brief Lightweight generic N-dimensional tensor (matrix) implementation.
  * @author r4qq
- * @date 2025
+ * @date 2025-2026
  */
 
 #pragma once
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -458,75 +457,6 @@ namespace Tensor
         }
 
         /**
-         * @brief Matrix multiplication. yep, O(n^3).
-         * @return New matrix (2nd rank tensor).
-         * @throws std::runtime_error if tensor is not 2-dimensional.
-         */
-        Tensor<T> matmul(const Tensor<T>& otherTensor) const
-        {
-            if (_shape.size() != 2 || otherTensor.shape().size() != 2) 
-            { 
-                throw std::runtime_error("matmul requires matrices (2D tensors)."); 
-            }
-
-            if (_shape[1] != otherTensor._shape[0])
-            {
-                throw std::invalid_argument("matmul dimension mismatch");
-            }
-
-            uint64_t r1 = this->_shape[0];
-            uint64_t c1 = this->_shape[1];
-            uint64_t c2 = otherTensor._shape[1];  
-
-            Tensor<T> result({r1, c2});
-            result.fill(0);
-            
-            const T* aPtr = this->data();
-            const T* bPtr = otherTensor.data();
-            T* cPtr = result.data();
-
-            for (uint64_t i = 0; i < r1; ++i) 
-            {
-                for (uint64_t k = 0; k < c1; ++k) 
-                {
-                    T a_ik = aPtr[i * c1 + k]; 
-                    
-                    for (uint64_t j = 0; j < c2; ++j) 
-                    {
-                        cPtr[i * c2 + j] += a_ik * bPtr[k * c2 + j];
-                    }
-                }
-            }
-            return result;
-        }
-
-        /**
-         * @brief Transpose a rank-2 tensor (matrix).
-         * @return New tensor with rows and columns swapped.
-         * @throws std::runtime_error if tensor is not 2-dimensional.
-         */
-        Tensor<T> transpose() const
-        {
-            if (_shape.size() != 2) 
-            { 
-                throw std::runtime_error("Transposition only supports matrices for now"); 
-            }
-
-            uint64_t rows = _shape[0], cols = _shape[1];
-            Tensor<T> result({cols, rows});
-
-            for (uint64_t i = 0; i < rows; ++i)
-            {
-                for (uint64_t j = 0; j < cols; ++j)
-                {
-                    result.unchecked(j, i) = this->unchecked(i, j);
-                }
-            }
-
-            return result;
-        }
-
-        /**
          * @brief Fill the tensor with a specified value.
          * @tparam U Type convertible to T.
          * @param value Value to fill.
@@ -583,5 +513,78 @@ namespace Tensor
     Tensor<T> operator*(const U& scalar, const Tensor<T>& tensor)
     {
         return tensor * scalar;
+    }
+
+    template<typename T>
+    void matmul(const Tensor<T>& a, const Tensor<T>& b, Tensor<T>& c)
+    {
+        if (a.shape().size() != 2 || b.shape().size() != 2) 
+        { 
+            throw std::runtime_error("matmul requires matrices (2D tensors)."); 
+        }
+        if (a.shape()[1] !=b.shape()[0])
+        {
+            throw std::invalid_argument("matmul dimension mismatch");
+        }
+        if (c.shape()[0] != a.shape()[0] || c.shape()[1] != b.shape()[1]) 
+        {
+            throw std::runtime_error("result tensor shape mismatch");
+        }
+        uint64_t r1 = a.shape()[0];
+        uint64_t c1 = a.shape()[1];
+        uint64_t c2 = b.shape()[1];
+        const T* aPtr = a.data();
+        const T* bPtr = b.data();
+        T* cPtr = c.data();
+        c.fill(T{0});
+        
+        
+        for (uint64_t i = 0; i < r1; ++i) 
+        {
+            const T* aRow = aPtr + (i * c1);
+            T* cRow = cPtr + (i * c2);
+            for (uint64_t k = 0; k < c1; ++k) 
+            {
+                T aIk = aRow[k]; 
+                const T* bRow = bPtr + (k * c2);
+                for (uint64_t j = 0; j < c2; ++j) 
+                {
+                    cRow[j] += aIk * bRow[j];
+                }
+            }
+        }
+    }
+
+    template<typename T>
+    void transpose(Tensor<T>& a, Tensor<T>& b)
+    {
+        if (a.shape().size() != 2 || b.shape().size() != 2) 
+        { 
+            throw std::runtime_error("Transposition only supports matrices for now"); 
+        }
+
+        if ((a.shape()[0] == a.shape()[1]) && (&a == &b)) 
+        {
+            uint64_t n = a.shape()[0];
+            for(uint64_t i = 0; i < n; ++i)
+            {
+                for(uint64_t j = i + 1; j < n; ++j)
+                {
+                    std::swap(a.unchecked(i, j), a.unchecked(j, i));
+                }
+            }
+        }
+        else 
+        {
+            uint64_t rows = a.shape()[0], cols = a.shape()[1];
+
+            for (uint64_t i = 0; i < rows; ++i)
+            {
+                for (uint64_t j = 0; j < cols; ++j)
+                {
+                    b.unchecked(j, i) = a.unchecked(i, j);
+                }
+            }
+        }
     }
 }
