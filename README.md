@@ -18,7 +18,7 @@
 
  ## Requirements
 
- - Compiler supporting **C++11** or later.
+ - Compiler supporting **C++17** or later.
  - No external libraries (relies only on the STL: `vector`, `algorithm`, `array`, etc.).
 
  ## Installation

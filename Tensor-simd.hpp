@@ -14,8 +14,9 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <immintrin.h>
 
-
+#define BLOCK_SIZE 256
 
 namespace Tensor
 {
@@ -516,73 +517,193 @@ namespace Tensor
     }
 
     template<typename T>
-    void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
+    void matmul(const Tensor<T>& a, const Tensor<T>& b, Tensor<T>& c)
     {
-        if (srcTnsr1.shape().size() != 2 || srcTnsr2.shape().size() != 2) 
+        if (a.shape().size() != 2 || b.shape().size() != 2) 
         { 
             throw std::runtime_error("matmul requires matrices (2D tensors)."); 
         }
-        if (srcTnsr1.shape()[1] !=srcTnsr2.shape()[0])
+        if (a.shape()[1] !=b.shape()[0])
         {
             throw std::invalid_argument("matmul dimension mismatch");
         }
-        if (outTnsr.shape()[0] != srcTnsr1.shape()[0] || outTnsr.shape()[1] != srcTnsr2.shape()[1]) 
+        if (c.shape()[0] != a.shape()[0] || c.shape()[1] != b.shape()[1]) 
         {
             throw std::runtime_error("result tensor shape mismatch");
         }
-        uint64_t r1 = srcTnsr1.shape()[0];
-        uint64_t c1 = srcTnsr1.shape()[1];
-        uint64_t c2 = srcTnsr2.shape()[1];
-        const T* aPtr = srcTnsr1.data();
-        const T* bPtr = srcTnsr2.data();
-        T* cPtr = outTnsr.data();
-        outTnsr.fill(T{0});
-        
-        
-        for (uint64_t i = 0; i < r1; ++i) 
+        uint64_t r1 = a.shape()[0];
+        uint64_t c1 = a.shape()[1];
+        uint64_t c2 = b.shape()[1];
+        const T* aPtr = a.data();
+        const T* bPtr = b.data();
+        T* cPtr = c.data();
+        c.fill(T{0});
+        // for (uint64_t i = 0; i < r1; ++i)
+        // {
+        //     const T* aRow = aPtr + i * c1;
+        //     T* cRow = cPtr + i * c2;
+
+        //     for (uint64_t k = 0; k < c1; ++k)
+        //     {
+        //         T aIk = aRow[k];
+        //         const T* bRow = bPtr + k * c2;
+
+        //         if constexpr (std::is_same_v<T, float>)
+        //         {
+        //             __m256 aSclr = _mm256_set1_ps(aIk);
+        //             uint64_t vecEnd = (c2 / 8) * 8;
+
+        //             uint64_t j = 0;
+        //             for (; j < vecEnd; j += 8)
+        //             {
+        //                 __m256 bVec = _mm256_loadu_ps(&bRow[j]);
+        //                 __m256 cVec = _mm256_loadu_ps(&cRow[j]);
+        //                 cVec = _mm256_fmadd_ps(aSclr, bVec, cVec);
+        //                 _mm256_storeu_ps(&cRow[j], cVec);
+        //             }
+
+        //             for (; j < c2; ++j)
+        //             {
+        //                 cRow[j] += aIk * bRow[j];
+        //             }
+        //         }
+        //         else if constexpr (std::is_same_v<T, double>)
+        //         {
+        //             __m256d aSclr = _mm256_set1_pd(aIk);
+        //             uint64_t vecEnd = (c2 / 4) * 4;
+
+        //             uint64_t j = 0;
+        //             for (; j < vecEnd; j += 4)
+        //             {
+        //                 __m256d bVec = _mm256_loadu_pd(&bRow[j]);
+        //                 __m256d cVec = _mm256_loadu_pd(&cRow[j]);
+        //                 cVec = _mm256_fmadd_pd(aSclr, bVec, cVec);
+        //                 _mm256_storeu_pd(&cRow[j], cVec);
+        //             }
+
+        //             for (; j < c2; ++j)
+        //             {
+        //                 cRow[j] += aIk * bRow[j];
+        //             }
+        //         }
+        //         else
+        //         {
+        //             for (uint64_t j = 0; j < c2; ++j)
+        //             {
+        //                 cRow[j] += aIk * bRow[j];
+        //             }
+        //         }
+        //     }
+        // }
+        for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
         {
-            const T* aRow = aPtr + (i * c1);
-            T* cRow = cPtr + (i * c2);
-            for (uint64_t k = 0; k < c1; ++k) 
+            for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
             {
-                T aIk = aRow[k]; 
-                const T* bRow = bPtr + (k * c2);
-                for (uint64_t j = 0; j < c2; ++j) 
+                for (uint64_t kk = 0; kk < c1; kk += BLOCK_SIZE) 
                 {
-                    cRow[j] += aIk * bRow[j];
+                    uint64_t iMin = std::min(ii + BLOCK_SIZE, r1);
+                    uint64_t jMin = std::min(jj + BLOCK_SIZE, c2);
+                    uint64_t kMin = std::min(kk + BLOCK_SIZE, c1);
+
+                    for (uint64_t i = ii; i < iMin; ++i) 
+                    {
+                        const T* aRow = aPtr + (i * c1);
+                        T* cRow = cPtr + (i * c2);
+                        for (uint64_t k = kk; k < kMin; ++k) 
+                        {
+                            T aIk = aRow[k]; 
+                            const T* bRow = bPtr + (k * c2);                            
+                            if constexpr (std::is_same_v<T, float>) 
+                            {
+                                uint64_t jLen = jMin - jj;
+                                uint64_t vecEnd = (jLen / 8) * 8;
+                                __m256 aSclr = _mm256_set1_ps(aIk);
+                                for (uint64_t j = 0; j < vecEnd; j += 8) 
+                                {
+                                    __m256 bVec= _mm256_loadu_ps(&bRow[jj + j]);
+                                    __m256 cVec= _mm256_loadu_ps(&cRow[jj + j]);
+                                    cVec = _mm256_fmadd_ps(aSclr, bVec, cVec);
+                                    _mm256_storeu_ps(&cRow[jj + j], cVec);
+                                }
+                                for (uint64_t j = vecEnd; j < jLen; ++j) 
+                                {
+                                    cRow[jj + j] += aIk * bRow[jj + j];
+                                }
+                            }
+                            else if constexpr (std::is_same_v<T, double>) 
+                            {
+                                uint64_t jLen = jMin - jj;
+                                uint64_t vecEnd = (jLen / 4) * 4;
+                                __m256d aSclr = _mm256_set1_pd(aIk);
+                                for (uint64_t j = 0; j < vecEnd; j += 4) 
+                                {
+                                    __m256d bVec= _mm256_loadu_pd(&bRow[jj + j]);
+                                    __m256d cVec= _mm256_loadu_pd(&cRow[jj + j]);
+                                    cVec = _mm256_fmadd_pd(aSclr, bVec, cVec);
+                                    _mm256_storeu_pd(&cRow[jj + j], cVec);
+                                }
+                                for (uint64_t j = vecEnd; j < jLen; ++j) 
+                                {
+                                    cRow[jj + j] += aIk * bRow[jj + j];
+                                }
+                            }
+                            else
+                            {
+                                for (uint64_t j = jj; j < jMin; ++j) 
+                                {
+                                    cRow[j] += aIk * bRow[j];
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+
+            // for (uint64_t i = 0; i < r1; ++i) 
+            // {
+            //     const T* aRow = aPtr + (i * c1);
+            //     T* cRow = cPtr + (i * c2);
+            //     for (uint64_t k = 0; k < c1; ++k) 
+            //     {
+            //         T aIk = aRow[k]; 
+            //         const T* bRow = bPtr + (k * c2);
+            //         for (uint64_t j = 0; j < c2; ++j) 
+            //         {
+            //             cRow[j] += aIk * bRow[j];
+            //         }
+            //     }
+            // }        
     }
 
     template<typename T>
-    void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
+    void transpose(Tensor<T>& a, Tensor<T>& b)
     {
-        if (srcTnsr.shape().size() != 2 || outTnsr.shape().size() != 2) 
+        if (a.shape().size() != 2 || b.shape().size() != 2) 
         { 
             throw std::runtime_error("Transposition only supports matrices for now"); 
         }
 
-        if ((srcTnsr.shape()[0] == srcTnsr.shape()[1]) && (&srcTnsr == &outTnsr)) 
+        if ((a.shape()[0] == a.shape()[1]) && (&a == &b)) 
         {
-            uint64_t n = srcTnsr.shape()[0];
+            uint64_t n = a.shape()[0];
             for(uint64_t i = 0; i < n; ++i)
             {
                 for(uint64_t j = i + 1; j < n; ++j)
                 {
-                    std::swap(srcTnsr.unchecked(i, j), srcTnsr.unchecked(j, i));
+                    std::swap(a.unchecked(i, j), a.unchecked(j, i));
                 }
             }
         }
         else 
         {
-            uint64_t rows = srcTnsr.shape()[0], cols = srcTnsr.shape()[1];
+            uint64_t rows = a.shape()[0], cols = a.shape()[1];
 
             for (uint64_t i = 0; i < rows; ++i)
             {
                 for (uint64_t j = 0; j < cols; ++j)
                 {
-                    outTnsr.unchecked(j, i) = srcTnsr.unchecked(i, j);
+                    b.unchecked(j, i) = a.unchecked(i, j);
                 }
             }
         }
