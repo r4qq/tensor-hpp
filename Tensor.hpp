@@ -516,27 +516,27 @@ namespace Tensor
     }
 
     template<typename T>
-    void matmul(const Tensor<T>& a, const Tensor<T>& b, Tensor<T>& c)
+    void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
     {
-        if (a.shape().size() != 2 || b.shape().size() != 2) 
+        if (srcTnsr1.shape().size() != 2 || srcTnsr2.shape().size() != 2) 
         { 
             throw std::runtime_error("matmul requires matrices (2D tensors)."); 
         }
-        if (a.shape()[1] !=b.shape()[0])
+        if (srcTnsr1.shape()[1] !=srcTnsr2.shape()[0])
         {
             throw std::invalid_argument("matmul dimension mismatch");
         }
-        if (c.shape()[0] != a.shape()[0] || c.shape()[1] != b.shape()[1]) 
+        if (outTnsr.shape()[0] != srcTnsr1.shape()[0] || outTnsr.shape()[1] != srcTnsr2.shape()[1]) 
         {
             throw std::runtime_error("result tensor shape mismatch");
         }
-        uint64_t r1 = a.shape()[0];
-        uint64_t c1 = a.shape()[1];
-        uint64_t c2 = b.shape()[1];
-        const T* aPtr = a.data();
-        const T* bPtr = b.data();
-        T* cPtr = c.data();
-        c.fill(T{0});
+        uint64_t r1 = srcTnsr1.shape()[0];
+        uint64_t c1 = srcTnsr1.shape()[1];
+        uint64_t c2 = srcTnsr2.shape()[1];
+        const T* aPtr = srcTnsr1.data();
+        const T* bPtr = srcTnsr2.data();
+        T* cPtr = outTnsr.data();
+        outTnsr.fill(T{0});
         
         
         for (uint64_t i = 0; i < r1; ++i) 
@@ -556,33 +556,33 @@ namespace Tensor
     }
 
     template<typename T>
-    void transpose(Tensor<T>& a, Tensor<T>& b)
+    void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
     {
-        if (a.shape().size() != 2 || b.shape().size() != 2) 
+        if (srcTnsr.shape().size() != 2 || outTnsr.shape().size() != 2) 
         { 
             throw std::runtime_error("Transposition only supports matrices for now"); 
         }
 
-        if ((a.shape()[0] == a.shape()[1]) && (&a == &b)) 
+        if ((srcTnsr.shape()[0] == srcTnsr.shape()[1]) && (&srcTnsr == &outTnsr)) 
         {
-            uint64_t n = a.shape()[0];
+            uint64_t n = srcTnsr.shape()[0];
             for(uint64_t i = 0; i < n; ++i)
             {
                 for(uint64_t j = i + 1; j < n; ++j)
                 {
-                    std::swap(a.unchecked(i, j), a.unchecked(j, i));
+                    std::swap(srcTnsr.unchecked(i, j), srcTnsr.unchecked(j, i));
                 }
             }
         }
         else 
         {
-            uint64_t rows = a.shape()[0], cols = a.shape()[1];
+            uint64_t rows = srcTnsr.shape()[0], cols = srcTnsr.shape()[1];
 
             for (uint64_t i = 0; i < rows; ++i)
             {
                 for (uint64_t j = 0; j < cols; ++j)
                 {
-                    b.unchecked(j, i) = a.unchecked(i, j);
+                    outTnsr.unchecked(j, i) = srcTnsr.unchecked(i, j);
                 }
             }
         }
