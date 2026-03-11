@@ -538,214 +538,195 @@ namespace Tensor
         const T* bPtr = b.data();
         T* cPtr = c.data();
         c.fill(T{0});
+
         if constexpr (std::is_same_v<T, float>) 
         {
-            uint64_t vecEnd = (c2 / 8) * 8;
-            uint64_t iLim = (r1 / 4) * 4;
-            for (uint64_t i = 0; i < iLim; i += 4) 
+            for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
             {
-                const T* aRow0 = aPtr + ((i + 0) * c1);
-                const T* aRow1 = aPtr + ((i + 1) * c1);
-                const T* aRow2 = aPtr + ((i + 2) * c1);
-                const T* aRow3 = aPtr + ((i + 3) * c1);
-
-                T* cRow0 = cPtr + ((i + 0) * c2);
-                T* cRow1 = cPtr + ((i + 1) * c2);
-                T* cRow2 = cPtr + ((i + 2) * c2);
-                T* cRow3 = cPtr + ((i + 3) * c2);
-
-                for (uint64_t k = 0; k < c1; ++k) 
+                for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
                 {
-                    // __m256 cVec0 = _mm256_loadu_ps(&cRow0[j]);
-                    // __m256 cVec1 = _mm256_loadu_ps(&cRow1[j]);
-                    // __m256 cVec2 = _mm256_loadu_ps(&cRow2[j]);
-                    // __m256 cVec3 = _mm256_loadu_ps(&cRow3[j]);
-                    
-                    const T* bRow =  bPtr + (k * c2);
-
-                    __m256 aSclr0 = _mm256_set1_ps(aRow0[k]);
-                    __m256 aSclr1 = _mm256_set1_ps(aRow1[k]);
-                    __m256 aSclr2 = _mm256_set1_ps(aRow2[k]);
-                    __m256 aSclr3 = _mm256_set1_ps(aRow3[k]);
-
-                    for (uint64_t j = 0; j < vecEnd; j += 8) 
+                    for (uint64_t kk = 0; kk < c1; kk += BLOCK_SIZE) 
                     {
-                        // __m256 bVec = _mm256_loadu_ps(&bPtr[k * c2  + j]);
+                        uint64_t iMin = std::min(ii + BLOCK_SIZE, r1);
+                        uint64_t jMin = std::min(jj + BLOCK_SIZE, c2);
+                        uint64_t kMin = std::min(kk + BLOCK_SIZE, c1);
+            
+                        uint64_t iLim = ii + ((iMin - ii) / 4) * 4;
+                        uint64_t vecEnd = jj + ((jMin - jj) / 8 ) * 8;
 
-                        // __m256 aSclr0 = _mm256_set1_ps(aRow0[k]);
-                        // __m256 aSclr1 = _mm256_set1_ps(aRow1[k]);
-                        // __m256 aSclr2 = _mm256_set1_ps(aRow2[k]);
-                        // __m256 aSclr3 = _mm256_set1_ps(aRow3[k]);
+                        for (uint64_t i = ii; i < iLim; i += 4) 
+                        {
+                            const T* aRow0 = aPtr + ((i + 0) * c1);
+                            const T* aRow1 = aPtr + ((i + 1) * c1);
+                            const T* aRow2 = aPtr + ((i + 2) * c1);
+                            const T* aRow3 = aPtr + ((i + 3) * c1);
 
-                        // cVec0 = _mm256_fmadd_ps(aSclr0, bVec, cVec0); 
-                        // cVec1 = _mm256_fmadd_ps(aSclr1, bVec, cVec1); 
-                        // cVec2 = _mm256_fmadd_ps(aSclr2, bVec, cVec2); 
-                        // cVec3 = _mm256_fmadd_ps(aSclr3, bVec, cVec3); 
+                            T* cRow0 = cPtr + ((i + 0) * c2);
+                            T* cRow1 = cPtr + ((i + 1) * c2);
+                            T* cRow2 = cPtr + ((i + 2) * c2);
+                            T* cRow3 = cPtr + ((i + 3) * c2);
 
-                        __m256 bVec = _mm256_loadu_ps(&bRow[j]);
+                            for (uint64_t j = jj; j < vecEnd; j += 8) 
+                            {
+                                __m256 cVec0 = _mm256_loadu_ps(&cRow0[j]);
+                                __m256 cVec1 = _mm256_loadu_ps(&cRow1[j]);
+                                __m256 cVec2 = _mm256_loadu_ps(&cRow2[j]);
+                                __m256 cVec3 = _mm256_loadu_ps(&cRow3[j]);
+                                
+                                for (uint64_t k = kk; k < kMin; ++k) 
+                                {
+                                    __m256 bVec = _mm256_loadu_ps(&bPtr[k * c2  + j]);
 
-                        __m256 cVec0 = _mm256_loadu_ps(&cRow0[j]);
-                        __m256 cVec1 = _mm256_loadu_ps(&cRow1[j]);
-                        __m256 cVec2 = _mm256_loadu_ps(&cRow2[j]);
-                        __m256 cVec3 = _mm256_loadu_ps(&cRow3[j]);
+                                    __m256 aSclr0 = _mm256_set1_ps(aRow0[k]);
+                                    __m256 aSclr1 = _mm256_set1_ps(aRow1[k]);
+                                    __m256 aSclr2 = _mm256_set1_ps(aRow2[k]);
+                                    __m256 aSclr3 = _mm256_set1_ps(aRow3[k]);
 
-                        cVec0 = _mm256_fmadd_ps(aSclr0, bVec, cVec0); 
-                        cVec1 = _mm256_fmadd_ps(aSclr1, bVec, cVec1); 
-                        cVec2 = _mm256_fmadd_ps(aSclr2, bVec, cVec2); 
-                        cVec3 = _mm256_fmadd_ps(aSclr3, bVec, cVec3); 
+                                    cVec0 = _mm256_fmadd_ps(aSclr0, bVec, cVec0); 
+                                    cVec1 = _mm256_fmadd_ps(aSclr1, bVec, cVec1); 
+                                    cVec2 = _mm256_fmadd_ps(aSclr2, bVec, cVec2); 
+                                    cVec3 = _mm256_fmadd_ps(aSclr3, bVec, cVec3); 
+                                }
+                                
+                                _mm256_storeu_ps(&cRow0[j], cVec0);
+                                _mm256_storeu_ps(&cRow1[j], cVec1);
+                                _mm256_storeu_ps(&cRow2[j], cVec2);
+                                _mm256_storeu_ps(&cRow3[j], cVec3);
+                            }
+                            for (uint64_t j = vecEnd; j < jMin; ++j) 
+                            {   
+                                for (uint64_t k = 0; k < kMin; ++k)
+                                {                        
+                                    cRow0[j] += aRow0[k] * bPtr[k * c2 + j];
+                                    cRow1[j] += aRow1[k] * bPtr[k * c2 + j];
+                                    cRow2[j] += aRow2[k] * bPtr[k * c2 + j];
+                                    cRow3[j] += aRow3[k] * bPtr[k * c2 + j];
 
-                        _mm256_storeu_ps(&cRow0[j], cVec0);
-                        _mm256_storeu_ps(&cRow1[j], cVec1);
-                        _mm256_storeu_ps(&cRow2[j], cVec2);
-                        _mm256_storeu_ps(&cRow3[j], cVec3);
-                    }
-                    
-                    // _mm256_storeu_ps(&cRow0[j], cVec0);
-                    // _mm256_storeu_ps(&cRow1[j], cVec1);
-                    // _mm256_storeu_ps(&cRow2[j], cVec2);
-                    // _mm256_storeu_ps(&cRow3[j], cVec3);
-                }
-                for (uint64_t j = vecEnd; j < c2; ++j) 
-                {   
-                    for (uint64_t k = 0; k < c1; ++k)
-                    {                        
-                        cRow0[j] += aRow0[k] * bPtr[k * c2 + j];
-                        cRow1[j] += aRow1[k] * bPtr[k * c2 + j];
-                        cRow2[j] += aRow2[k] * bPtr[k * c2 + j];
-                        cRow3[j] += aRow3[k] * bPtr[k * c2 + j];
+                                }
+                            }
+                        }
+                        for (uint64_t i = iLim; i < iMin; ++i) 
+                        {
+                            const T* aRow = aPtr + (i * c1);
+                            T* cRow = cPtr + (i * c2);
 
-                    }
-                }
-            }
-            for (uint64_t i = iLim; i < r1; i += 1) 
-            {
-                const T* aRow = aPtr + (i * c1);
-                T* cRow = cPtr + (i * c2);
-
-                for (uint64_t k = 0; k < c1; ++k) 
-                {
-                    T aIk = aRow[k]; 
-                    const T* bRow = bPtr + (k * c2);
-                    
-                    __m256 aSclr = _mm256_set1_ps(aIk);
-                    
-                    for (uint64_t j = 0; j < vecEnd; j += 8) 
-                    {
-                        __m256 bVec= _mm256_loadu_ps(&bRow[j]);
-                        __m256 cVec= _mm256_loadu_ps(&cRow[j]);
-                        cVec = _mm256_fmadd_ps(aSclr, bVec, cVec);
-                        _mm256_storeu_ps(&cRow[j], cVec);
-                    }
-                    
-                    for (uint64_t j = vecEnd; j < c2; ++j) 
-                    {
-                        cRow[j] += aIk * bRow[j];
+                            for (uint64_t k = kk; k < kMin; ++k) 
+                            {
+                                T aIk = aRow[k]; 
+                                const T* bRow = bPtr + (k * c2);
+                                
+                                __m256 aSclr = _mm256_set1_ps(aIk);
+                            
+                                for (uint64_t j = jj; j < vecEnd; j += 8) 
+                                {
+                                    __m256 bVec= _mm256_loadu_ps(&bRow[j]);
+                                    __m256 cVec= _mm256_loadu_ps(&cRow[j]);
+                                    cVec = _mm256_fmadd_ps(aSclr, bVec, cVec);
+                                    _mm256_storeu_ps(&cRow[j], cVec);
+                                }
+                                
+                                for (uint64_t j = vecEnd; j < jMin; ++j) 
+                                {
+                                    cRow[j] += aIk * bRow[j];
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
         else if constexpr (std::is_same_v<T, double>) 
         {
-            uint64_t vecEnd = (c2 / 4) * 4;
-            uint64_t iLim = (r1 / 4) * 4;
-            for (uint64_t i = 0; i < iLim; i += 4) 
+            for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
             {
-                const T* aRow0 = aPtr + ((i + 0) * c1);
-                const T* aRow1 = aPtr + ((i + 1) * c1);
-                const T* aRow2 = aPtr + ((i + 2) * c1);
-                const T* aRow3 = aPtr + ((i + 3) * c1);
-
-                T* cRow0 = cPtr + ((i + 0) * c2);
-                T* cRow1 = cPtr + ((i + 1) * c2);
-                T* cRow2 = cPtr + ((i + 2) * c2);
-                T* cRow3 = cPtr + ((i + 3) * c2);
-
-                for (uint64_t k = 0; k < c1; ++k) 
+                for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
                 {
-                    // __m256 cVec0 = _mm256_loadu_ps(&cRow0[j]);
-                    // __m256 cVec1 = _mm256_loadu_ps(&cRow1[j]);
-                    // __m256 cVec2 = _mm256_loadu_ps(&cRow2[j]);
-                    // __m256 cVec3 = _mm256_loadu_ps(&cRow3[j]);
-                    
-                    const T* bRow =  bPtr + (k * c2);
-
-                    __m256d aSclr0 = _mm256_set1_pd(aRow0[k]);
-                    __m256d aSclr1 = _mm256_set1_pd(aRow1[k]);
-                    __m256d aSclr2 = _mm256_set1_pd(aRow2[k]);
-                    __m256d aSclr3 = _mm256_set1_pd(aRow3[k]);
-
-                    for (uint64_t j = 0; j < vecEnd; j += 4) 
+                    for (uint64_t kk = 0; kk < c1; kk += BLOCK_SIZE) 
                     {
-                        // __m256 bVec = _mm256_loadu_ps(&bPtr[k * c2  + j]);
+                        uint64_t iMin = std::min(ii + BLOCK_SIZE, r1);
+                        uint64_t jMin = std::min(jj + BLOCK_SIZE, c2);
+                        uint64_t kMin = std::min(kk + BLOCK_SIZE, c1);
+            
+                        uint64_t iLim = ii + ((iMin - ii) / 4) * 4;
+                        uint64_t vecEnd = jj + ((jMin - jj) / 4 ) * 4;
 
-                        // __m256 aSclr0 = _mm256_set1_ps(aRow0[k]);
-                        // __m256 aSclr1 = _mm256_set1_ps(aRow1[k]);
-                        // __m256 aSclr2 = _mm256_set1_ps(aRow2[k]);
-                        // __m256 aSclr3 = _mm256_set1_ps(aRow3[k]);
+                        for (uint64_t i = ii; i < iLim; i += 4) 
+                        {
+                            const T* aRow0 = aPtr + ((i + 0) * c1);
+                            const T* aRow1 = aPtr + ((i + 1) * c1);
+                            const T* aRow2 = aPtr + ((i + 2) * c1);
+                            const T* aRow3 = aPtr + ((i + 3) * c1);
 
-                        // cVec0 = _mm256_fmadd_ps(aSclr0, bVec, cVec0); 
-                        // cVec1 = _mm256_fmadd_ps(aSclr1, bVec, cVec1); 
-                        // cVec2 = _mm256_fmadd_ps(aSclr2, bVec, cVec2); 
-                        // cVec3 = _mm256_fmadd_ps(aSclr3, bVec, cVec3); 
+                            T* cRow0 = cPtr + ((i + 0) * c2);
+                            T* cRow1 = cPtr + ((i + 1) * c2);
+                            T* cRow2 = cPtr + ((i + 2) * c2);
+                            T* cRow3 = cPtr + ((i + 3) * c2);
 
-                        __m256d bVec = _mm256_loadu_pd(&bRow[j]);
+                            for (uint64_t j = jj; j < vecEnd; j += 4) 
+                            {
+                                __m256d cVec0 = _mm256_loadu_pd(&cRow0[j]);
+                                __m256d cVec1 = _mm256_loadu_pd(&cRow1[j]);
+                                __m256d cVec2 = _mm256_loadu_pd(&cRow2[j]);
+                                __m256d cVec3 = _mm256_loadu_pd(&cRow3[j]);
+                                
+                                for (uint64_t k = kk; k < kMin; ++k) 
+                                {
+                                    __m256d bVec = _mm256_loadu_pd(&bPtr[k * c2  + j]);
 
-                        __m256d cVec0 = _mm256_loadu_pd(&cRow0[j]);
-                        __m256d cVec1 = _mm256_loadu_pd(&cRow1[j]);
-                        __m256d cVec2 = _mm256_loadu_pd(&cRow2[j]);
-                        __m256d cVec3 = _mm256_loadu_pd(&cRow3[j]);
+                                    __m256d aSclr0 = _mm256_set1_pd(aRow0[k]);
+                                    __m256d aSclr1 = _mm256_set1_pd(aRow1[k]);
+                                    __m256d aSclr2 = _mm256_set1_pd(aRow2[k]);
+                                    __m256d aSclr3 = _mm256_set1_pd(aRow3[k]);
 
-                        cVec0 = _mm256_fmadd_pd(aSclr0, bVec, cVec0); 
-                        cVec1 = _mm256_fmadd_pd(aSclr1, bVec, cVec1); 
-                        cVec2 = _mm256_fmadd_pd(aSclr2, bVec, cVec2); 
-                        cVec3 = _mm256_fmadd_pd(aSclr3, bVec, cVec3); 
+                                    cVec0 = _mm256_fmadd_pd(aSclr0, bVec, cVec0); 
+                                    cVec1 = _mm256_fmadd_pd(aSclr1, bVec, cVec1); 
+                                    cVec2 = _mm256_fmadd_pd(aSclr2, bVec, cVec2); 
+                                    cVec3 = _mm256_fmadd_pd(aSclr3, bVec, cVec3); 
+                                }
+                                
+                                _mm256_storeu_pd(&cRow0[j], cVec0);
+                                _mm256_storeu_pd(&cRow1[j], cVec1);
+                                _mm256_storeu_pd(&cRow2[j], cVec2);
+                                _mm256_storeu_pd(&cRow3[j], cVec3);
+                            }
+                            for (uint64_t j = vecEnd; j < jMin; ++j) 
+                            {   
+                                for (uint64_t k = 0; k < kMin; ++k)
+                                {                        
+                                    cRow0[j] += aRow0[k] * bPtr[k * c2 + j];
+                                    cRow1[j] += aRow1[k] * bPtr[k * c2 + j];
+                                    cRow2[j] += aRow2[k] * bPtr[k * c2 + j];
+                                    cRow3[j] += aRow3[k] * bPtr[k * c2 + j];
 
-                        _mm256_storeu_pd(&cRow0[j], cVec0);
-                        _mm256_storeu_pd(&cRow1[j], cVec1);
-                        _mm256_storeu_pd(&cRow2[j], cVec2);
-                        _mm256_storeu_pd(&cRow3[j], cVec3);
-                    }
-                    
-                    // _mm256_storeu_ps(&cRow0[j], cVec0);
-                    // _mm256_storeu_ps(&cRow1[j], cVec1);
-                    // _mm256_storeu_ps(&cRow2[j], cVec2);
-                    // _mm256_storeu_ps(&cRow3[j], cVec3);
-                }
-                for (uint64_t j = vecEnd; j < c2; ++j) 
-                {   
-                    for (uint64_t k = 0; k < c1; ++k)
-                    {                        
-                        cRow0[j] += aRow0[k] * bPtr[k * c2 + j];
-                        cRow1[j] += aRow1[k] * bPtr[k * c2 + j];
-                        cRow2[j] += aRow2[k] * bPtr[k * c2 + j];
-                        cRow3[j] += aRow3[k] * bPtr[k * c2 + j];
+                                }
+                            }
+                        }
+                        for (uint64_t i = iLim; i < iMin; ++i) 
+                        {
+                            const T* aRow = aPtr + (i * c1);
+                            T* cRow = cPtr + (i * c2);
 
-                    }
-                }
-            }
-            for (uint64_t i = iLim; i < r1; i += 1) 
-            {
-                const T* aRow = aPtr + (i * c1);
-                T* cRow = cPtr + (i * c2);
-
-                for (uint64_t k = 0; k < c1; ++k) 
-                {
-                    T aIk = aRow[k]; 
-                    const T* bRow = bPtr + (k * c2);
-                    
-                    __m256d aSclr = _mm256_set1_pd(aIk);
-                    
-                    for (uint64_t j = 0; j < vecEnd; j += 4) 
-                    {
-                        __m256d bVec= _mm256_loadu_pd(&bRow[j]);
-                        __m256d cVec= _mm256_loadu_pd(&cRow[j]);
-                        cVec = _mm256_fmadd_pd(aSclr, bVec, cVec);
-                        _mm256_storeu_pd(&cRow[j], cVec);
-                    }
-                    
-                    for (uint64_t j = vecEnd; j < c2; ++j) 
-                    {
-                        cRow[j] += aIk * bRow[j];
+                            for (uint64_t k = kk; k < kMin; ++k) 
+                            {
+                                T aIk = aRow[k]; 
+                                const T* bRow = bPtr + (k * c2);
+                                
+                                __m256d aSclr = _mm256_set1_pd(aIk);
+                                
+                                for (uint64_t j = jj; j < vecEnd; j += 4) 
+                                {
+                                    __m256d bVec= _mm256_loadu_pd(&bRow[j]);
+                                    __m256d cVec= _mm256_loadu_pd(&cRow[j]);
+                                    cVec = _mm256_fmadd_pd(aSclr, bVec, cVec);
+                                    _mm256_storeu_pd(&cRow[j], cVec);
+                                }
+                                
+                                for (uint64_t j = vecEnd; j < jMin; ++j) 
+                                {
+                                    cRow[j] += aIk * bRow[j];
+                                }
+                            }
+                        }
                     }
                 }
             }
