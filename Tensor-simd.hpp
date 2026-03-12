@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
+#include <sys/types.h>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -719,6 +720,94 @@ namespace Tensor
                 }
             }
         }
+    }
+
+    template<typename T>
+    void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
+    {
+        if (srcTnsr.shape().size() != 2 || srcVec.shape().size() != 1) 
+        {
+            throw std::invalid_argument("matvec requires matrix & tensor");
+        }
+        if (srcTnsr.shape()[1] != srcVec.shape()[0]) 
+        {
+            throw std::invalid_argument("matvec dimension mismatch");
+        }
+        if (outVec.shape()[0] != srcTnsr.shape()[0]) 
+        {
+            throw std::invalid_argument("result vector size mismatch");
+        }
+
+        uint64_t r1 = srcTnsr.shape()[0];
+        uint64_t r2 = srcVec.shape()[0];
+        const T* stPtr = srcTnsr.data();
+        const T* svPtr = srcVec.data();
+        T* outPtr = outVec.data();
+        
+        outVec.fill(T{0});
+
+        if constexpr (std::is_same_v<T, float>) 
+        {
+        
+        }
+        else if constexpr (std::is_same_v<T, double>) 
+        {
+            uint64_t vecEnd = (r2 /4) * 4;
+            uint64_t iLim = (r1 / 4) * 4;
+
+            for (uint64_t i = 0; i < iLim; i += 4) 
+            {
+                const T* stRow0 = stPtr + ((i + 0) * r2);
+                const T* stRow1 = stPtr + ((i + 1) * r2);
+                const T* stRow2 = stPtr + ((i + 2) * r2);
+                const T* stRow3 = stPtr + ((i + 3) * r2);
+
+                __m256d acc0 = _mm256_setzero_pd(); 
+                __m256d acc1 = _mm256_setzero_pd();
+                __m256d acc2 = _mm256_setzero_pd();
+                __m256d acc3 = _mm256_setzero_pd();
+
+                for (uint64_t j = 0; j < vecEnd; j += 4) 
+                {
+                    __m256d vecVec = _mm256_loadu_pd(&svPtr[j]);
+
+                    __m256d stRowVec0 = _mm256_loadu_pd(&stRow0[j]);
+                    __m256d stRowVec1 = _mm256_loadu_pd(&stRow1[j]);
+                    __m256d stRowVec2 = _mm256_loadu_pd(&stRow2[j]);
+                    __m256d stRowVec3 = _mm256_loadu_pd(&stRow3[j]);
+                    
+                    acc0 = _mm256_fmadd_pd(stRowVec0, vecVec, acc0);
+                    acc1 = _mm256_fmadd_pd(stRowVec1, vecVec, acc1);
+                    acc2 = _mm256_fmadd_pd(stRowVec2, vecVec, acc2);
+                    acc3 = _mm256_fmadd_pd(stRowVec3, vecVec, acc3);
+                }
+
+            }
+        }
+        else 
+        {
+            for (uint64_t i = 0; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        }
+        
+        // for (uint64_t i = 0; i < r1; ++i) 
+        // {
+        //     const T* aRow = aPtr + (i * r2);
+        //     T sum = 0;
+        //     for (uint64_t j = 0; j < r2; ++j) 
+        //     {
+        //         sum += aRow[j] * bPtr[j];
+        //     }
+        //     cPtr[i] = sum;
+        // }
     }
 
     template<typename T>

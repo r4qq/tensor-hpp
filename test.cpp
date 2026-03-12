@@ -127,6 +127,38 @@ void testEquality()
     assert(a != b);
 }
 
+void testMatvec()
+{
+    // Matrix (2x3)
+    // [ 1, 2, 3 ]
+    // [ 4, 5, 6 ]
+    Tensor::Tensor<int> a({2, 3});
+    
+    // Vector (3)
+    // [ 7, 8, 9 ]
+    Tensor::Tensor<int> x({3});
+    
+    // Output Vector (2)
+    Tensor::Tensor<int> y({2});
+
+    // Initialize Matrix
+    int val = 1;
+    for (uint64_t i = 0; i < 2; ++i)
+        for (uint64_t j = 0; j < 3; ++j)
+            a(i, j) = val++;
+
+    // Initialize Input Vector
+    x(0) = 7; x(1) = 8; x(2) = 9;
+
+    Tensor::matvec(a, x, y);
+
+    // Expected:
+    // row0: (1*7) + (2*8) + (3*9) = 7 + 16 + 27 = 50
+    // row1: (4*7) + (5*8) + (6*9) = 28 + 40 + 54 = 122
+    assert(y(0) == 50);
+    assert(y(1) == 122);
+}
+
 void benchmarkMatmul()
 {
     using Clock = std::chrono::high_resolution_clock;
@@ -206,6 +238,7 @@ int main()
     testMatmul();
     testTranspose();
     testEquality();
+    testMatvec();
 
     std::cout << "All correctness tests passed.\n";
 

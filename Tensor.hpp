@@ -520,7 +520,7 @@ namespace Tensor
     {
         if (srcTnsr1.shape().size() != 2 || srcTnsr2.shape().size() != 2) 
         { 
-            throw std::runtime_error("matmul requires matrices (2D tensors)."); 
+            throw std::invalid_argument("matmul requires matrices (2D tensors)."); 
         }
         if (srcTnsr1.shape()[1] !=srcTnsr2.shape()[0])
         {
@@ -528,7 +528,7 @@ namespace Tensor
         }
         if (outTnsr.shape()[0] != srcTnsr1.shape()[0] || outTnsr.shape()[1] != srcTnsr2.shape()[1]) 
         {
-            throw std::runtime_error("result tensor shape mismatch");
+            throw std::invalid_argument("result tensor shape mismatch");
         }
         uint64_t r1 = srcTnsr1.shape()[0];
         uint64_t c1 = srcTnsr1.shape()[1];
@@ -536,8 +536,8 @@ namespace Tensor
         const T* aPtr = srcTnsr1.data();
         const T* bPtr = srcTnsr2.data();
         T* cPtr = outTnsr.data();
-        outTnsr.fill(T{0});
         
+        outTnsr.fill(T{0});
         
         for (uint64_t i = 0; i < r1; ++i) 
         {
@@ -552,6 +552,42 @@ namespace Tensor
                     cRow[j] += aIk * bRow[j];
                 }
             }
+        }
+    }
+
+    template<typename T>
+    void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
+    {
+        if (srcTnsr.shape().size() != 2 || srcVec.shape().size() != 1) 
+        {
+            throw std::invalid_argument("matvec requires matrix & tensor");
+        }
+        if (srcTnsr.shape()[1] != srcVec.shape()[0]) 
+        {
+            throw std::invalid_argument("matvec dimension mismatch");
+        }
+        if (outVec.shape()[0] != srcTnsr.shape()[0]) 
+        {
+            throw std::invalid_argument("result vector size mismatch");
+        }
+
+        uint64_t r1 = srcTnsr.shape()[0];
+        uint64_t r2 = srcVec.shape()[0];
+        const T* aPtr = srcTnsr.data();
+        const T* bPtr = srcVec.data();
+        T* cPtr = outVec.data();
+        
+        outVec.fill(T{0});
+
+        for (uint64_t i = 0; i < r1; ++i) 
+        {
+            const T* aRow = aPtr + (i * r2);
+            T sum = 0;
+            for (uint64_t j = 0; j < r2; ++j) 
+            {
+                sum += aRow[j] * bPtr[j];
+            }
+            cPtr[i] = sum;
         }
     }
 
