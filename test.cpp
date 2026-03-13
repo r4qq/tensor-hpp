@@ -285,7 +285,7 @@ void benchmarkMatvec()
         std::cout << "Run " << r + 1 << ": "
                   << elapsed.count() << " ms\n";
 
-        double flops = 2.0 * N * N * N;
+        double flops = 2.0 * N * N;
         double gflops = (flops / 1e9) / (elapsed.count() / 1000.0);
 
         std::cout << "GFLOPS: " << gflops << "\n";
