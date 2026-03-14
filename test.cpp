@@ -3,7 +3,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <chrono>
-#include "Tensor.hpp"
+#include "Tensor-simd-block.hpp"
 
 void testConstruction()
 {
@@ -160,6 +160,7 @@ void testMatvec()
     assert(y(1) == 122);
 }
 
+template<typename T>
 void benchmarkMatmul()
 {
     using Clock = std::chrono::high_resolution_clock;
@@ -169,17 +170,18 @@ void benchmarkMatmul()
     const int warmupRuns = 50; 
 
     std::cout << "\nBenchmarking matmul with "
-              << N << "x" << N << " matrices\n";
+              << N << "x" << N << " matrices\n"
+              << "using " << typeid(T).name() << " type\n";
 
-    Tensor::Tensor<double> a({N, N});
-    Tensor::Tensor<double> b({N, N});
-    Tensor::Tensor<double> c({N, N});
+    Tensor::Tensor<T> a({N, N});
+    Tensor::Tensor<T> b({N, N});
+    Tensor::Tensor<T> c({N, N});
 
     for (uint64_t i = 0; i < N; ++i)
         for (uint64_t j = 0; j < N; ++j)
         {
-            a(i, j) = static_cast<double>((i + j) % 10);
-            b(i, j) = static_cast<double>((i * j) % 10);
+            a(i, j) = static_cast<T>((i + j) % 10);
+            b(i, j) = static_cast<T>((i * j) % 10);
         }
 
     // Warm-up run
@@ -229,6 +231,7 @@ void benchmarkMatmul()
               << " ms\n\n";
 }
 
+template<typename T>
 void benchmarkMatvec()
 {
     using Clock = std::chrono::high_resolution_clock;
@@ -239,18 +242,19 @@ void benchmarkMatvec()
 
     std::cout << "Benchmarking matvec with " 
               << N << "x" << N << " matrix\n"
-              << "and " << N << " size vector\n";
+              << "and " << N << " size vector\n"
+              << "using " << typeid(T).name() << " type\n";
 
-    Tensor::Tensor<double> a({N, N});
-    Tensor::Tensor<double> x({N});
-    Tensor::Tensor<double> y({N});
+    Tensor::Tensor<T> a({N, N});
+    Tensor::Tensor<T> x({N});
+    Tensor::Tensor<T> y({N});
 
     for(uint64_t i = 0; i < N; ++i)
     {
-        x(i) = static_cast<double>((i) % 10);
+        x(i) = static_cast<T>((i) % 10);
         for(uint64_t j = 0; j < N; ++j)
         {
-            a(i, j) = static_cast<double>((i + j) % 10);
+            a(i, j) = static_cast<T>((i + j) % 10);
         }
     }
 
@@ -309,8 +313,9 @@ int main()
 
     std::cout << "All correctness tests passed.\n";
 
-    benchmarkMatmul();
-    benchmarkMatvec();
-
+    benchmarkMatmul<double>();
+    benchmarkMatvec<double>();
+    benchmarkMatmul<float>();
+    benchmarkMatvec<float>();
     return 0;
 }

@@ -751,6 +751,194 @@ namespace Tensor
     }
 
     template<typename T>
+    void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
+    {
+        if (srcTnsr.shape().size() != 2 || srcVec.shape().size() != 1) 
+        {
+            throw std::invalid_argument("matvec requires matrix & tensor");
+        }
+        if (srcTnsr.shape()[1] != srcVec.shape()[0]) 
+        {
+            throw std::invalid_argument("matvec dimension mismatch");
+        }
+        if (outVec.shape()[0] != srcTnsr.shape()[0]) 
+        {
+            throw std::invalid_argument("result vector size mismatch");
+        }
+
+        uint64_t r1 = srcTnsr.shape()[0];
+        uint64_t r2 = srcVec.shape()[0];
+        const T* stPtr = srcTnsr.data();
+        const T* svPtr = srcVec.data();
+        T* outPtr = outVec.data();
+        
+        outVec.fill(T{0});
+
+        if constexpr (std::is_same_v<T, float>) 
+        {
+            uint64_t vecEnd = (r2 / 8) * 8;
+            uint64_t iLim = (r1 / 4) * 4;
+
+            for (uint64_t i = 0; i < iLim; i += 4) 
+            {
+                T tmp[8];
+                T sum0{0}, sum1{0}, sum2{0}, sum3{0};
+                
+                const T* stRow0 = stPtr + ((i + 0) * r2);
+                const T* stRow1 = stPtr + ((i + 1) * r2);
+                const T* stRow2 = stPtr + ((i + 2) * r2);
+                const T* stRow3 = stPtr + ((i + 3) * r2);
+
+                __m256 acc0 = _mm256_setzero_ps(); 
+                __m256 acc1 = _mm256_setzero_ps();
+                __m256 acc2 = _mm256_setzero_ps();
+                __m256 acc3 = _mm256_setzero_ps();
+
+                for (uint64_t j = 0; j < vecEnd; j += 8) 
+                {
+                    __m256 vecVec = _mm256_loadu_ps(&svPtr[j]);
+
+                    __m256 stRowVec0 = _mm256_loadu_ps(&stRow0[j]);
+                    __m256 stRowVec1 = _mm256_loadu_ps(&stRow1[j]);
+                    __m256 stRowVec2 = _mm256_loadu_ps(&stRow2[j]);
+                    __m256 stRowVec3 = _mm256_loadu_ps(&stRow3[j]);
+                    
+                    acc0 = _mm256_fmadd_ps(stRowVec0, vecVec, acc0);
+                    acc1 = _mm256_fmadd_ps(stRowVec1, vecVec, acc1);
+                    acc2 = _mm256_fmadd_ps(stRowVec2, vecVec, acc2);
+                    acc3 = _mm256_fmadd_ps(stRowVec3, vecVec, acc3);
+                }
+                _mm256_storeu_ps(tmp, acc0);
+                sum0 = tmp[0] + tmp[1] + tmp[2] + tmp[3] + 
+                       tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                _mm256_storeu_ps(tmp, acc1);
+                sum1 = tmp[0] + tmp[1] + tmp[2] + tmp[3] + 
+                       tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                _mm256_storeu_ps(tmp, acc2);
+                sum2 = tmp[0] + tmp[1] + tmp[2] + tmp[3] + 
+                       tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                _mm256_storeu_ps(tmp, acc3);
+                sum3 = tmp[0] + tmp[1] + tmp[2] + tmp[3] + 
+                       tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                for (uint64_t j = vecEnd; j < r2; ++j) 
+                {
+                    sum0 += stRow0[j] * svPtr[j];
+                    sum1 += stRow1[j] * svPtr[j];
+                    sum2 += stRow2[j] * svPtr[j];
+                    sum3 += stRow3[j] * svPtr[j];
+                }
+
+                outPtr[i + 0] = sum0;
+                outPtr[i + 1] = sum1;
+                outPtr[i + 2] = sum2;
+                outPtr[i + 3] = sum3;
+
+            }
+            
+            for (uint64_t i = iLim; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        }
+        else if constexpr (std::is_same_v<T, double>) 
+        {
+            uint64_t vecEnd = (r2 /4) * 4;
+            uint64_t iLim = (r1 / 4) * 4;
+
+            for (uint64_t i = 0; i < iLim; i += 4) 
+            {
+                T tmp[4];
+                T sum0{0}, sum1{0}, sum2{0}, sum3{0};
+
+                const T* stRow0 = stPtr + ((i + 0) * r2);
+                const T* stRow1 = stPtr + ((i + 1) * r2);
+                const T* stRow2 = stPtr + ((i + 2) * r2);
+                const T* stRow3 = stPtr + ((i + 3) * r2);
+
+                __m256d acc0 = _mm256_setzero_pd(); 
+                __m256d acc1 = _mm256_setzero_pd();
+                __m256d acc2 = _mm256_setzero_pd();
+                __m256d acc3 = _mm256_setzero_pd();
+
+                for (uint64_t j = 0; j < vecEnd; j += 4) 
+                {
+                    __m256d vecVec = _mm256_loadu_pd(&svPtr[j]);
+
+                    __m256d stRowVec0 = _mm256_loadu_pd(&stRow0[j]);
+                    __m256d stRowVec1 = _mm256_loadu_pd(&stRow1[j]);
+                    __m256d stRowVec2 = _mm256_loadu_pd(&stRow2[j]);
+                    __m256d stRowVec3 = _mm256_loadu_pd(&stRow3[j]);
+                    
+                    acc0 = _mm256_fmadd_pd(stRowVec0, vecVec, acc0);
+                    acc1 = _mm256_fmadd_pd(stRowVec1, vecVec, acc1);
+                    acc2 = _mm256_fmadd_pd(stRowVec2, vecVec, acc2);
+                    acc3 = _mm256_fmadd_pd(stRowVec3, vecVec, acc3);
+                }
+
+                _mm256_storeu_pd(tmp, acc0);
+                sum0 = tmp[0] + tmp[1] + tmp[2] +tmp[3];
+
+                _mm256_storeu_pd(tmp, acc1);
+                sum1 = tmp[0] + tmp[1] + tmp[2] +tmp[3];
+
+                _mm256_storeu_pd(tmp, acc2);
+                sum2 = tmp[0] + tmp[1] + tmp[2] +tmp[3];
+                 
+                _mm256_storeu_pd(tmp, acc3);
+                sum3 = tmp[0] + tmp[1] + tmp[2] +tmp[3]; 
+
+                for (uint64_t j = vecEnd; j < r2; ++j) 
+                {
+                    sum0 += stRow0[j] * svPtr[j];
+                    sum1 += stRow1[j] * svPtr[j];
+                    sum2 += stRow2[j] * svPtr[j];
+                    sum3 += stRow3[j] * svPtr[j];
+                }
+
+                outPtr[i + 0] = sum0;
+                outPtr[i + 1] = sum1;
+                outPtr[i + 2] = sum2;
+                outPtr[i + 3] = sum3;
+
+            }
+            
+            for (uint64_t i = iLim; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        }
+        else 
+        {
+            for (uint64_t i = 0; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        }
+    }
+
+    template<typename T>
     void transpose(Tensor<T>& a, Tensor<T>& b)
     {
         if (a.shape().size() != 2 || b.shape().size() != 2) 
