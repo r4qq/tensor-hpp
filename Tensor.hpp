@@ -533,23 +533,23 @@ namespace Tensor
         uint64_t r1 = srcTnsr1.shape()[0];
         uint64_t c1 = srcTnsr1.shape()[1];
         uint64_t c2 = srcTnsr2.shape()[1];
-        const T* aPtr = srcTnsr1.data();
-        const T* bPtr = srcTnsr2.data();
-        T* cPtr = outTnsr.data();
+        const T* st1Ptr = srcTnsr1.data();
+        const T* st2Ptr = srcTnsr2.data();
+        T* otPtr = outTnsr.data();
         
         outTnsr.fill(T{0});
         
         for (uint64_t i = 0; i < r1; ++i) 
         {
-            const T* aRow = aPtr + (i * c1);
-            T* cRow = cPtr + (i * c2);
+            const T* st1Row = st1Ptr + (i * c1);
+            T* otRow = otPtr + (i * c2);
             for (uint64_t k = 0; k < c1; ++k) 
             {
-                T aIk = aRow[k]; 
-                const T* bRow = bPtr + (k * c2);
+                T st1Sclr = st1Row[k]; 
+                const T* st2Row = st2Ptr + (k * c2);
                 for (uint64_t j = 0; j < c2; ++j) 
                 {
-                    cRow[j] += aIk * bRow[j];
+                    otRow[j] += st1Sclr * st2Row[j];
                 }
             }
         }
@@ -573,21 +573,21 @@ namespace Tensor
 
         uint64_t r1 = srcTnsr.shape()[0];
         uint64_t r2 = srcVec.shape()[0];
-        const T* aPtr = srcTnsr.data();
-        const T* bPtr = srcVec.data();
-        T* cPtr = outVec.data();
+        const T* stPtr = srcTnsr.data();
+        const T* svPtr = srcVec.data();
+        T* ovPtr = outVec.data();
         
         outVec.fill(T{0});
 
         for (uint64_t i = 0; i < r1; ++i) 
         {
-            const T* aRow = aPtr + (i * r2);
+            const T* stRow = stPtr + (i * r2);
             T sum = 0;
             for (uint64_t j = 0; j < r2; ++j) 
             {
-                sum += aRow[j] * bPtr[j];
+                sum += stRow[j] * svPtr[j];
             }
-            cPtr[i] = sum;
+            ovPtr[i] = sum;
         }
     }
 
