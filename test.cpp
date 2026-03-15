@@ -130,32 +130,21 @@ void testEquality()
 
 void testMatvec()
 {
-    // Matrix (2x3)
-    // [ 1, 2, 3 ]
-    // [ 4, 5, 6 ]
     Tensor::Tensor<int> a({2, 3});
     
-    // Vector (3)
-    // [ 7, 8, 9 ]
     Tensor::Tensor<int> x({3});
     
-    // Output Vector (2)
     Tensor::Tensor<int> y({2});
 
-    // Initialize Matrix
     int val = 1;
     for (uint64_t i = 0; i < 2; ++i)
         for (uint64_t j = 0; j < 3; ++j)
             a(i, j) = val++;
 
-    // Initialize Input Vector
     x(0) = 7; x(1) = 8; x(2) = 9;
 
     Tensor::matvec(a, x, y);
 
-    // Expected:
-    // row0: (1*7) + (2*8) + (3*9) = 7 + 16 + 27 = 50
-    // row1: (4*7) + (5*8) + (6*9) = 28 + 40 + 54 = 122
     assert(y(0) == 50);
     assert(y(1) == 122);
 }
@@ -165,7 +154,7 @@ void benchmarkMatmul()
 {
     using Clock = std::chrono::high_resolution_clock;
 
-    const uint64_t N = 1000;   // adjust if needed
+    const uint64_t N = 1000;  
     const int testRuns = 20;
     const int warmupRuns = 50; 
 
@@ -184,18 +173,13 @@ void benchmarkMatmul()
             b(i, j) = static_cast<T>((i * j) % 10);
         }
 
-    // Warm-up run
     std::cout << "Warming up CPU (Burning PL2 state) with " << warmupRuns << " runs" << std::endl;
 
-    // 1. Hammer the CPU to build heat and trigger the AVX offset
     for (int w = 0; w < warmupRuns; ++w) 
     {
         Tensor::matmul(a, b, c);
     }
 
-    // 2. The Compiler Sink
-    // Force the compiler to evaluate the math by reading a single value.
-    // 'volatile' ensures the compiler cannot optimize this read away.
     volatile float sink = c.unchecked(0, 0);
 
     std::cout << "Warm-up complete. Starting benchmark..." << std::endl;
@@ -214,7 +198,6 @@ void benchmarkMatmul()
         std::chrono::duration<double, std::milli> elapsed = end - start;
         totalMs += elapsed.count();
 
-        // prevent optimization removal
         volatile double sink = c(0,0);
         (void)sink;
 
