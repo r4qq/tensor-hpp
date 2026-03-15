@@ -1,129 +1,84 @@
- # tensor-hpp
+# tensor-hpp
 
- A lightweight, header-only C++ library implementing generic N-dimensional tensors. 
+A lightweight, header-only C++ library implementing generic N-dimensional tensors with optional SIMD and cache-blocked optimizations.
 
- ## Key Features
+## Key Features
 
- - **Generic**: Supports any arithmetic type (`int`, `float`, `double`, etc.).
- - **N-Dimensional**: Create tensors of any rank and shape.
- - **Element Access**:
-   - Safe (bounds-checked) via the `()` operator.
-   - Fast (unchecked) via the `unchecked()` method.
- - **Arithmetic**: Full support for element-wise operations (`+`, `-`, `*`, `/`) and in-place operators (`+=`, `-=`, etc.).
- - **Scalar Operations**: Scalar multiplication and division (both left and right side).
- - **Linear Algebra**:
-   - Matrix multiplication (`matmul`) for 2D tensors.
-   - Transposition for 2D tensors.
- - **Safety**: Throws exceptions for shape mismatches or out-of-bounds access.
+- Generic: Supports any arithmetic type (int, float, double, etc.).
+- N-Dimensional: Create tensors of any rank and shape.
+- Performance Optimized:
+    * Standard: Clean, STL-based implementation for general use.
+    * SIMD: AVX2 and FMA accelerated kernels for float and double operations.
+    * Cache-Blocked: Tiled matrix operations (BLOCK_SIZE 32) to maximize L1/L2 cache efficiency for large datasets.
+- Element Access:
+    * Safe (bounds-checked) via the () operator.
+    * Fast (unchecked) via the unchecked() method.
+- Arithmetic: Full support for element-wise operations (+, -, *, /) and in-place operators (+=, -=, etc.).
+- Linear Algebra:
+    * Matrix multiplication (matmul) for 2D tensors.
+    * Matrix-vector multiplication (matvec).
+    * Transposition for 2D tensors.
+- Safety: Throws exceptions for shape mismatches or out-of-bounds access.
 
- ## Requirements
+## Requirements
 
- - Compiler supporting **C++17** or later.
- - No external libraries (relies only on the STL: `vector`, `algorithm`, `array`, etc.).
+- Compiler supporting C++17 or later.
+- AVX2 Support: Required if using Tensor-simd.hpp or Tensor-simd-block.hpp.
+- No external libraries (relies only on the STL and <immintrin.h> for SIMD).
 
- ## Installation
+## Installation
 
- Since this is a *header-only* library, installation is as simple as copying the `Tensor.hpp` file into your project.
+Since this is a header-only library, installation is as simple as copying the header file into your project.
 
- 1. Download `Tensor.hpp`.
- 2. Place it in your project's source directory.
- 3. Include it in your code:
+Options avaiable:
 
- ```cpp
- #include "Tensor.hpp"
- ```
+  - Tensor.hpp: Standard version.
+  - Tensor-simd.hpp: AVX2 optimized.
+  - Tensor-simd-block.hpp: AVX2 + Cache Blocking (Recommended for large matrices).
 
- ## Usage
 
- ### 1. Creating a Tensor
+## Usage
 
- Tensors are initialized with a vector specifying their dimensions (shape).
+### 1. Creating a Tensor
+Tensors are initialized with a vector specifying their dimensions (shape).
 
- ```cpp
- #include "Tensor.hpp"
- #include <iostream>
+Example:
 
- using namespace Tensor;
+```cpp
+    #include "Tensor-simd-block.hpp"
 
- int main() {
-     // Create a 3D tensor of size 2x3x4 filled with zeros
-     Tensor<double> t({2, 3, 4});
-    
-     // Fill with a specific value
-     t.fill(1.5);
-    
-     return 0;
- }
- ```
+    Tensor::Tensor<float> A({1000, 1000});
+    A.fill(1.0f);
+```
 
- ### 2. Accessing Data
+### 2. Matrix and Vector Operations
+Specific optimized routines are available for rank-2 tensors (matrices) and rank-1 tensors (vectors).
 
- ```cpp
- // Safe write (throws std::out_of_range on error)
- t(0, 1, 3) = 10.0;
+Example:
 
- // Read
- double val = t(0, 1, 3);
+```cpp
+    #include "Tensor-simd.hpp"
 
- // Fast access (for critical loops, no bounds checking)
- t.unchecked(0, 0, 0) = 5.0;
- ```
+    Tensor::Tensor<double> MatA({1000, 1000});
+    Tensor::Tensor<double> MatB({1000, 1000});
+    Tensor::Tensor<double> Result({1000, 1000});
 
- ### 3. Arithmetic Operations
+    Tensor::matmul(MatA, MatB, Result);
 
- You can perform operations on tensors of the same shape.
+    Tensor::Tensor<double> x({1000});
+    Tensor::Tensor<double> y({1000});
 
- ```cpp
- Tensor<int> A({2, 2});
- A.fill(10);
+    Tensor::matvec(MatA, x, y);
+```
 
- Tensor<int> B({2, 2});
- B.fill(5);
+## Error Handling
+The library throws standard C++ exceptions:
+- std::invalid_argument: Shape mismatch, incorrect index count, or division by zero.
+- std::out_of_range: Out-of-bounds access.
+- std::runtime_error: Matrix operations on non-2D tensors or result shape mismatches.
 
- auto Sum = A + B;       // Result: all elements = 15
- auto Product = A * B;   // Result: all elements = 50 (element-wise)
- auto Div = A / B;       // Result: all elements = 2
- ```
+## License
+Project released under the MIT License. See the LICENSE file for details.
 
- ### 4. Scalar Operations
-
- ```cpp
- Tensor<float> T({10});
- T.fill(1.0f);
-
- auto T2 = T * 5.0f;      // All elements = 5.0
- auto T3 = 2.0f * T;      // Works on the left side too
- T2 /= 2.5f;              // In-place operation
- ```
-
- ### 5. Matrix Operations (2D Tensors)
-
- Specific operations are available for rank-2 tensors (matrices).
-
- ```cpp
- Tensor<double> MatA({2, 3}); // 2x3 Matrix
- MatA.fill(1.0);
-
- Tensor<double> MatB({3, 2}); // 3x2 Matrix
- MatB.fill(2.0);
-
- // Matrix multiplication (result: 2x2 matrix)
- Tensor<double> Result = MatA.matmul(MatB);
-
- // Transpose
- Tensor<double> Transposed = MatA.transpose(); // Result: 3x2 matrix
- ```
-
- ## Error Handling
-
- The library throws standard C++ exceptions:
- - `std::invalid_argument`: Shape mismatch in operations, incorrect number of indices, division by zero.
- - `std::out_of_range`: Attempt to access an index out of bounds.
- - `std::runtime_error`: Attempting matrix operations on non-2D tensors.
-
- ## License
-
- Project released under the MIT License. See the LICENSE file for details.
-
- ---
- Author: r4qq (2025)
+---
+Author: r4qq (2025-2026)

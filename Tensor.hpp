@@ -515,12 +515,20 @@ namespace Tensor
         return tensor * scalar;
     }
 
+    /**
+     * @brief Performs standard Matrix Multiplication.
+     * @note Optimized for cache-friendliness using a row-major dot product approach.
+     * @param srcTnsr1 Left-hand matrix.
+     * @param srcTnsr2 Right-hand matrix.
+     * @param outTnsr Output matrix where results are stored.
+     * @throws std::invalid_argument If input tensors are not 2D or if dimensions are incompatible.
+     */
     template<typename T>
     void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
     {
         if (srcTnsr1.shape().size() != 2 || srcTnsr2.shape().size() != 2) 
         { 
-            throw std::runtime_error("matmul requires matrices (2D tensors)."); 
+            throw std::invalid_argument("matmul requires matrices (2D tensors)."); 
         }
         if (srcTnsr1.shape()[1] !=srcTnsr2.shape()[0])
         {
@@ -528,33 +536,82 @@ namespace Tensor
         }
         if (outTnsr.shape()[0] != srcTnsr1.shape()[0] || outTnsr.shape()[1] != srcTnsr2.shape()[1]) 
         {
-            throw std::runtime_error("result tensor shape mismatch");
+            throw std::invalid_argument("result tensor shape mismatch");
         }
         uint64_t r1 = srcTnsr1.shape()[0];
         uint64_t c1 = srcTnsr1.shape()[1];
         uint64_t c2 = srcTnsr2.shape()[1];
-        const T* aPtr = srcTnsr1.data();
-        const T* bPtr = srcTnsr2.data();
-        T* cPtr = outTnsr.data();
-        outTnsr.fill(T{0});
+        const T* st1Ptr = srcTnsr1.data();
+        const T* st2Ptr = srcTnsr2.data();
+        T* otPtr = outTnsr.data();
         
+        outTnsr.fill(T{0});
         
         for (uint64_t i = 0; i < r1; ++i) 
         {
-            const T* aRow = aPtr + (i * c1);
-            T* cRow = cPtr + (i * c2);
+            const T* st1Row = st1Ptr + (i * c1);
+            T* otRow = otPtr + (i * c2);
             for (uint64_t k = 0; k < c1; ++k) 
             {
-                T aIk = aRow[k]; 
-                const T* bRow = bPtr + (k * c2);
+                T st1Sclr = st1Row[k]; 
+                const T* st2Row = st2Ptr + (k * c2);
                 for (uint64_t j = 0; j < c2; ++j) 
                 {
-                    cRow[j] += aIk * bRow[j];
+                    otRow[j] += st1Sclr * st2Row[j];
                 }
             }
         }
     }
 
+    /**
+     * @brief Performs Matrix-Vector Multiplication.
+     * @param srcTnsr The input matrix.
+     * @param srcVec The input vector, must be a 1D tensor.
+     * @param outVec The output vector where results are stored.
+     * @throws std::invalid_argument if dimensions or ranks are mismatched.
+     */
+    template<typename T>
+    void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
+    {
+        if (srcTnsr.shape().size() != 2 || srcVec.shape().size() != 1) 
+        {
+            throw std::invalid_argument("matvec requires matrix & tensor");
+        }
+        if (srcTnsr.shape()[1] != srcVec.shape()[0]) 
+        {
+            throw std::invalid_argument("matvec dimension mismatch");
+        }
+        if (outVec.shape()[0] != srcTnsr.shape()[0]) 
+        {
+            throw std::invalid_argument("result vector size mismatch");
+        }
+
+        uint64_t r1 = srcTnsr.shape()[0];
+        uint64_t r2 = srcVec.shape()[0];
+        const T* stPtr = srcTnsr.data();
+        const T* svPtr = srcVec.data();
+        T* ovPtr = outVec.data();
+        
+        outVec.fill(T{0});
+
+        for (uint64_t i = 0; i < r1; ++i) 
+        {
+            const T* stRow = stPtr + (i * r2);
+            T sum = 0;
+            for (uint64_t j = 0; j < r2; ++j) 
+            {
+                sum += stRow[j] * svPtr[j];
+            }
+            ovPtr[i] = sum;
+        }
+    }
+
+    /**
+     * @brief Transposes a 2D matrix.
+     * @param srcTnsr The input matrix to transpose.
+     * @param outTnsr The output matrix to store the result. Supports in-place for square matrices.
+     * @throws std::runtime_error If the input is not a 2D tensor.
+     */
     template<typename T>
     void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
     {

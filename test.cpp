@@ -1,8 +1,9 @@
+#include <cstdint>
 #include <iostream>
 #include <cassert>
 #include <stdexcept>
 #include <chrono>
-#include "Tensor.hpp"
+#include "Tensor-simd-block.hpp"
 
 void testConstruction()
 {
@@ -127,40 +128,58 @@ void testEquality()
     assert(a != b);
 }
 
+void testMatvec()
+{
+    Tensor::Tensor<int> a({2, 3});
+    
+    Tensor::Tensor<int> x({3});
+    
+    Tensor::Tensor<int> y({2});
+
+    int val = 1;
+    for (uint64_t i = 0; i < 2; ++i)
+        for (uint64_t j = 0; j < 3; ++j)
+            a(i, j) = val++;
+
+    x(0) = 7; x(1) = 8; x(2) = 9;
+
+    Tensor::matvec(a, x, y);
+
+    assert(y(0) == 50);
+    assert(y(1) == 122);
+}
+
+template<typename T>
 void benchmarkMatmul()
 {
     using Clock = std::chrono::high_resolution_clock;
 
-    const uint64_t N = 1000;   // adjust if needed
+    const uint64_t N = 1000;  
     const int testRuns = 20;
     const int warmupRuns = 50; 
 
     std::cout << "\nBenchmarking matmul with "
-              << N << "x" << N << " matrices\n";
+              << N << "x" << N << " matrices\n"
+              << "using " << typeid(T).name() << " type\n";
 
-    Tensor::Tensor<double> a({N, N});
-    Tensor::Tensor<double> b({N, N});
-    Tensor::Tensor<double> c({N, N});
+    Tensor::Tensor<T> a({N, N});
+    Tensor::Tensor<T> b({N, N});
+    Tensor::Tensor<T> c({N, N});
 
     for (uint64_t i = 0; i < N; ++i)
         for (uint64_t j = 0; j < N; ++j)
         {
-            a(i, j) = static_cast<double>((i + j) % 10);
-            b(i, j) = static_cast<double>((i * j) % 10);
+            a(i, j) = static_cast<T>((i + j) % 10);
+            b(i, j) = static_cast<T>((i * j) % 10);
         }
 
-    // Warm-up run
     std::cout << "Warming up CPU (Burning PL2 state) with " << warmupRuns << " runs" << std::endl;
 
-    // 1. Hammer the CPU to build heat and trigger the AVX offset
     for (int w = 0; w < warmupRuns; ++w) 
     {
-        matmul(a, b, c);
+        Tensor::matmul(a, b, c);
     }
 
-    // 2. The Compiler Sink
-    // Force the compiler to evaluate the math by reading a single value.
-    // 'volatile' ensures the compiler cannot optimize this read away.
     volatile float sink = c.unchecked(0, 0);
 
     std::cout << "Warm-up complete. Starting benchmark..." << std::endl;
@@ -179,7 +198,6 @@ void benchmarkMatmul()
         std::chrono::duration<double, std::milli> elapsed = end - start;
         totalMs += elapsed.count();
 
-        // prevent optimization removal
         volatile double sink = c(0,0);
         (void)sink;
 
@@ -187,6 +205,74 @@ void benchmarkMatmul()
                   << elapsed.count() << " ms\n";
 
         double flops = 2.0 * N * N * N;
+        double gflops = (flops / 1e9) / (elapsed.count() / 1000.0);
+
+        std::cout << "GFLOPS: " << gflops << "\n";
+    }
+
+    std::cout << "Average: " << (totalMs / testRuns)
+              << " ms\n\n";
+}
+
+template<typename T>
+void benchmarkMatvec()
+{
+    using Clock = std::chrono::high_resolution_clock;
+
+    const uint64_t N = 1000;
+    const int testRuns = 20;
+    const int warmupRuns = 50;
+
+    std::cout << "Benchmarking matvec with " 
+              << N << "x" << N << " matrix\n"
+              << "and " << N << " size vector\n"
+              << "using " << typeid(T).name() << " type\n";
+
+    Tensor::Tensor<T> a({N, N});
+    Tensor::Tensor<T> x({N});
+    Tensor::Tensor<T> y({N});
+
+    for(uint64_t i = 0; i < N; ++i)
+    {
+        x(i) = static_cast<T>((i) % 10);
+        for(uint64_t j = 0; j < N; ++j)
+        {
+            a(i, j) = static_cast<T>((i + j) % 10);
+        }
+    }
+
+    std::cout << "Warming up CPU (Burning PL2 state) with " << warmupRuns << " runs" << std::endl;
+
+    for (uint64_t w = 0; w < warmupRuns; w++) 
+    {
+        Tensor::matvec(a, x, y);
+    }
+
+    volatile double sink = y(0);
+
+    std::cout << "Warm-up complete. Starting benchmark..." << std::endl;
+
+    double totalMs = 0.0; 
+
+    for (uint64_t r = 0; r < testRuns; ++r) 
+    {
+        auto start = Clock::now();
+
+        Tensor::matvec(a, x, y);
+
+        auto stop = Clock::now();
+
+        std::chrono::duration<double, std::milli> elapsed = stop - start;
+        totalMs += elapsed.count();
+
+        volatile double sink = y(0);
+
+        (void)sink;
+
+        std::cout << "Run " << r + 1 << ": "
+                  << elapsed.count() << " ms\n";
+
+        double flops = 2.0 * N * N;
         double gflops = (flops / 1e9) / (elapsed.count() / 1000.0);
 
         std::cout << "GFLOPS: " << gflops << "\n";
@@ -206,10 +292,13 @@ int main()
     testMatmul();
     testTranspose();
     testEquality();
+    testMatvec();
 
     std::cout << "All correctness tests passed.\n";
 
-    benchmarkMatmul();
-
+    benchmarkMatmul<double>();
+    benchmarkMatvec<double>();
+    benchmarkMatmul<float>();
+    benchmarkMatvec<float>();
     return 0;
 }
