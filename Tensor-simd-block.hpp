@@ -516,6 +516,22 @@ namespace Tensor
         return tensor * scalar;
     }
 
+
+    /**
+     * @brief Block-based SIMD Matrix Multiplication.
+     * @details This implementation divides the matrices into small blocks of size 
+     * BLOCK_SIZE x BLOCK_SIZE. It processes these blocks using SIMD 
+     * kernels to minimize cache misses in large-scale computations.
+     *
+     * Implementation details:
+     * - Tiled loops (ii, jj, kk) to stay within CPU cache.
+     * - Vectorized kernels inside tiles for peak GFLOPS.
+     * - Handling of fringe elements for matrices not divisible by BLOCK_SIZE or SIMD width.
+     *
+     * @param srcTnsr1 Left-hand matrix.
+     * @param srcTnsr2 Right-hand matrix.
+     * @param outTnsr Output matrix where results are stored.
+     */
     template<typename T>
     void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& scrTnsr2, Tensor<T>& outTnsr)
     {
@@ -750,6 +766,13 @@ namespace Tensor
         }
     }
 
+    /**
+     * @brief SIMD-optimized Matrix-Vector Multiplication.
+     * @details Vectorizes the horizontal sum of products using AVX2.
+     * @param srcTnsr Input matrix.
+     * @param srcVec Input 1D tensor.
+     * @param outVec Result vector.
+     */
     template<typename T>
     void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
     {
@@ -938,6 +961,12 @@ namespace Tensor
         }
     }
 
+    /**
+     * @brief Transposes a 2D matrix.
+     * @param srcTnsr The input matrix to transpose.
+     * @param outTnsr The output matrix to store the result. Supports in-place for square matrices.
+     * @throws std::runtime_error If the input is not a 2D tensor.
+     */
     template<typename T>
     void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
     {

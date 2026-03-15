@@ -515,6 +515,14 @@ namespace Tensor
         return tensor * scalar;
     }
 
+    /**
+     * @brief Performs standard Matrix Multiplication.
+     * @note Optimized for cache-friendliness using a row-major dot product approach.
+     * @param srcTnsr1 Left-hand matrix.
+     * @param srcTnsr2 Right-hand matrix.
+     * @param outTnsr Output matrix where results are stored.
+     * @throws std::invalid_argument If input tensors are not 2D or if dimensions are incompatible.
+     */
     template<typename T>
     void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
     {
@@ -555,6 +563,13 @@ namespace Tensor
         }
     }
 
+    /**
+     * @brief Performs Matrix-Vector Multiplication.
+     * @param srcTnsr The input matrix.
+     * @param srcVec The input vector, must be a 1D tensor.
+     * @param outVec The output vector where results are stored.
+     * @throws std::invalid_argument if dimensions or ranks are mismatched.
+     */
     template<typename T>
     void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
     {
@@ -591,6 +606,12 @@ namespace Tensor
         }
     }
 
+    /**
+     * @brief Transposes a 2D matrix.
+     * @param srcTnsr The input matrix to transpose.
+     * @param outTnsr The output matrix to store the result. Supports in-place for square matrices.
+     * @throws std::runtime_error If the input is not a 2D tensor.
+     */
     template<typename T>
     void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
     {

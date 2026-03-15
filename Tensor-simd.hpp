@@ -517,6 +517,18 @@ namespace Tensor
         return tensor * scalar;
     }
 
+    /**
+     * @brief SIMD-optimized Matrix Multiplication.
+     * @details Uses AVX2 intrinsics and Fused Multiply-Add (FMA) for floating-point types.
+     * Features:
+     * - Vectorized inner loops (8-wide for float, 4-wide for double).
+     * - Loop unrolling on the 'i' dimension to maximize register usage.
+     * - Fallback to standard row-major multiplication for non-supported types.
+     * * @tparam T Element type.
+     * @param srcTnsr1 Left-hand matrix.
+     * @param srcTnsr2 Right-hand matrix.
+     * @param outTnsr Output matrix where results are stored.
+     */
     template<typename T>
     void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
     {
@@ -723,6 +735,13 @@ namespace Tensor
         }
     }
 
+    /**
+     * @brief SIMD-optimized Matrix-Vector Multiplication.
+     * @details Vectorizes the horizontal sum of products using AVX2.
+     * @param srcTnsr Input matrix.
+     * @param srcVec Input 1D tensor.
+     * @param outVec Result vector.
+     */
     template<typename T>
     void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
     {
@@ -922,6 +941,12 @@ namespace Tensor
         // }
     }
 
+    /**
+     * @brief Transposes a 2D matrix.
+     * @param srcTnsr The input matrix to transpose.
+     * @param outTnsr The output matrix to store the result. Supports in-place for square matrices.
+     * @throws std::runtime_error If the input is not a 2D tensor.
+     */
     template<typename T>
     void transpose(Tensor<T>& a, Tensor<T>& b)
     {
