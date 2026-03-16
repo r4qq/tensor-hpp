@@ -1,5 +1,7 @@
 # tensor-hpp
 
+## Note: Project for learning purposes. Not for serious use.
+
 A lightweight, header-only C++ library implementing generic N-dimensional tensors with optional SIMD and cache-blocked optimizations.
 
 ## Key Features
