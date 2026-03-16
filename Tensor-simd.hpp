@@ -699,14 +699,14 @@ namespace Tensor
                     T st1Sclr = st1Row[k]; 
                     const T* st2Row = st2Ptr + (k * c2);
                     
-                    __m256 aSclr = _mm256_set1_ps(st1Sclr);
+                    __m256d aSclr = _mm256_set1_pd(st1Sclr);
                     
                     for (uint64_t j = 0; j < vecEnd; j += 4) 
                     {
-                        __m256 st2Vec = _mm256_loadu_ps(&st2Row[j]);
-                        __m256 otVec = _mm256_loadu_ps(&otRow[j]);
-                        otVec = _mm256_fmadd_ps(aSclr, st2Vec, otVec);
-                        _mm256_storeu_ps(&otRow[j], otVec);
+                        __m256d st2Vec = _mm256_loadu_pd(&st2Row[j]);
+                        __m256d otVec = _mm256_loadu_pd(&otRow[j]);
+                        otVec = _mm256_fmadd_pd(aSclr, st2Vec, otVec);
+                        _mm256_storeu_pd(&otRow[j], otVec);
                     }
                     
                     for (uint64_t j = vecEnd; j < c2; ++j) 
