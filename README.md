@@ -1,76 +1,64 @@
 # tensor-hpp
 
-## Note: Project for learning purposes. Not for serious use.
+**Note: Educational Project**
+This is a lightweight, header-only C++17 library developed to explore hardware-level optimizations, modern C++ template metaprogramming, and linear algebra implementation. It is not intended for production environments.
 
-A lightweight, header-only C++ library implementing generic N-dimensional tensors with optional SIMD and cache-blocked optimizations.
+## Technical Overview
 
-## Key Features
+The project implements a generic N-dimensional tensor class with an emphasis on performance scaling. It demonstrates the progression from a standard C++ implementation to a highly optimized kernel utilizing SIMD instructions and CPU cache awareness.
 
-- Generic: Supports any arithmetic type (int, float, double, etc.).
-- N-Dimensional: Create tensors of any rank and shape.
-- Performance Optimized:
-    * Standard: Clean, STL-based implementation for general use.
-    * SIMD: AVX2 and FMA accelerated kernels for float and double operations.
-    * Cache-Blocked: Tiled matrix operations (BLOCK_SIZE 32) to maximize L1/L2 cache efficiency for large datasets.
-- Element Access:
-    * Safe (bounds-checked) via the () operator.
-    * Fast (unchecked) via the unchecked() method.
-- Arithmetic: Full support for element-wise operations (+, -, *, /) and in-place operators (+=, -=, etc.).
-- Linear Algebra:
-    * Matrix multiplication (matmul) for 2D tensors.
-    * Matrix-vector multiplication (matvec).
-    * Transposition for 2D tensors.
-- Safety: Throws exceptions for shape mismatches or out-of-bounds access.
+### Core Concepts Applied
+* **Modern C++:** Variadic templates for N-dimensional indexing, `if constexpr` for compile-time branch evaluation, and compile-time type assertions (`std::is_arithmetic`).
+* **Hardware Optimization:** Explicit SIMD vectorization using AVX2 and Fused Multiply-Add (FMA) intrinsics.
+* **Memory Architecture:** Row-major contiguous memory layout, loop unrolling, and cache-tiled matrix multiplication (blocking) to minimize L1/L2 cache misses.
+* **API Design:** Operator overloading for element-wise arithmetic, providing both strict bounds-checked access via `()` and fast unchecked access for hot loops.
 
-## Requirements
+## Repository Structure
 
-- Compiler supporting C++17 or later.
-- AVX2 Support: Required if using Tensor-simd.hpp or Tensor-simd-block.hpp.
-- No external libraries (relies only on the STL and <immintrin.h> for SIMD).
+The library is separated into three distinct implementations to demonstrate the impact of different optimization techniques:
 
-## Installation
+* **`Tensor.hpp`**
+  A standard, STL-compliant implementation. Focuses on correctness, memory layout, and generic N-dimensional logic.
+* **`Tensor-simd.hpp`**
+  Replaces standard loops in `matmul` and `matvec` with AVX2/FMA intrinsic kernels (8-wide for `float`, 4-wide for `double`). Includes loop unrolling to maximize register usage.
+* **`Tensor-simd-block.hpp`**
+  Combines the AVX2 kernels with cache blocking (BLOCK_SIZE 32). Partitions matrices into smaller tiles to ensure data remains resident in the CPU cache during multi-pass computations.
 
-Since this is a header-only library, installation is as simple as copying the header file into your project.
+## System Requirements
 
-Options avaiable:
+* C++17 compliant compiler.
+* CPU with AVX2 and FMA support (for SIMD headers).
+* Zero third-party dependencies (utilizes STL and `<immintrin.h>`).
 
-  - Tensor.hpp: Standard version.
-  - Tensor-simd.hpp: AVX2 optimized.
-  - Tensor-simd-block.hpp: AVX2 + Cache Blocking (Recommended for large matrices).
-
-
-## Usage
-
-### 1. Creating a Tensor
-Tensors are initialized with a vector specifying their dimensions (shape).
-
-Example:
+## Example
 
 ```cpp
-    #include "Tensor-simd-block.hpp"
+#include "Tensor-simd-block.hpp"
 
+int main() {
+    // Initialize 2D tensors (matrices)
     Tensor::Tensor<float> A({1000, 1000});
-    A.fill(1.0f);
-```
+    Tensor::Tensor<float> B({1000, 1000});
+    Tensor::Tensor<float> C({1000, 1000});
 
-### 2. Matrix and Vector Operations
-Specific optimized routines are available for rank-2 tensors (matrices) and rank-1 tensors (vectors).
+    A.fill(1.5f);
+    B.fill(2.0f);
 
-Example:
+    // Element-wise arithmetic operations
+    A += B;
 
-```cpp
-    #include "Tensor-simd.hpp"
+    // Cache-blocked, SIMD-accelerated matrix multiplication
+    Tensor::matmul(A, B, C);
 
-    Tensor::Tensor<double> MatA({1000, 1000});
-    Tensor::Tensor<double> MatB({1000, 1000});
-    Tensor::Tensor<double> Result({1000, 1000});
+    // Matrix-vector multiplication
+    Tensor::Tensor<float> x({1000});
+    Tensor::Tensor<float> y({1000});
+    x.fill(1.0f);
 
-    Tensor::matmul(MatA, MatB, Result);
+    Tensor::matvec(A, x, y);
 
-    Tensor::Tensor<double> x({1000});
-    Tensor::Tensor<double> y({1000});
-
-    Tensor::matvec(MatA, x, y);
+    return 0;
+}
 ```
 
 ## Error Handling
