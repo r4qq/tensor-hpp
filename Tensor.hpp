@@ -1,8 +1,7 @@
 /**
  * @file Tensor.hpp
- * @brief Lightweight generic N-dimensional tensor (matrix) implementation.
- * @author r4qq
- * @date 2025-2026
+ * @brief Lightweight generic N-dimensional tensor.
+ * @author r4qq (2025-2026)
  */
 
 #pragma once
@@ -15,40 +14,20 @@
 #include <utility>
 #include <vector>
 
-
-
 namespace Tensor
 {
-    /**
-     * @class Tensor
-     * @brief A generic N-dimensional tensor supporting element-wise operations.
-     *
-     * Provides:
-     * - Basic element access
-     * - Element-wise arithmetic
-     * - Scalar operations
-     * - Matrix transpose (for rank-2 tensors)
-     *
-     * @tparam T Element type (must be arithmetic).
-     */
+    /// N-dimensional generic tensor for numeric types.
     template<typename T>
     class Tensor
     {
         static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
 
     private:
-        std::vector<uint64_t> _shape;       ///< Dimensions of the tensor.
-        std::vector<uint64_t> _strides;     ///< Stride values for flat indexing.
-        std::vector<T> _data;             ///< Contiguous storage for tensor data.
+        std::vector<uint64_t> _shape;     ///< Tensor dimensions.
+        std::vector<uint64_t> _strides;   ///< Strides for flat indexing.
+        std::vector<T> _data;             ///< Contiguous data storage.
 
-        /**
-         * @brief Apply an element-wise binary operation between two tensors.
-         * @tparam BinaryOp Binary operation type (e.g., std::plus, std::multiplies).
-         * @param otherTensor The other tensor to combine with.
-         * @param op Binary operation functor.
-         * @return New tensor containing the result.
-         * @throws std::invalid_argument if shapes do not match.
-         */
+        /// Applies an element-wise binary operation.
         template<typename BinaryOp>
         Tensor<T> elementWiseOp(const Tensor<T>& otherTensor, BinaryOp op) const
         {
@@ -66,26 +45,14 @@ namespace Tensor
             return result;
         }
 
-        /**
-         * @brief Compute the flattened (linear) index from N-dimensional indices.
-         * @tparam I Compile-time index sequence corresponding to tensor dimensions.
-         * @tparam Indices Variadic index argument types.
-         * @param idxs N-dimensional indices.
-         * @return Flattened index into the underlying contiguous storage.
-         */
+        /// Computes 1D index from N-dimensional indices.
         template<std::uint64_t... I, typename... Indices>
         inline uint64_t computeFlatUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
             return ((static_cast<uint64_t>(idxs) * _strides[I]) + ...);
         }
 
-         /**
-         * @brief Validate N-dimensional indices against tensor bounds.
-         * @tparam I Compile-time index sequence corresponding to tensor dimensions.
-         * @tparam Indices Variadic index argument types.
-         * @param idxs N-dimensional indices.
-         * @throws std::out_of_range if any index exceeds its dimension bounds.
-         */
+         /// Validates N-dimensional indices against bounds.
         template<std::uint64_t... I, typename... Indices>
         inline void checkBoundsUnrolled(std::index_sequence<I...>, Indices... idxs) const
         {
@@ -96,11 +63,7 @@ namespace Tensor
         }
 
     public:
-        /**
-         * @brief Construct a tensor of given shape with default-initialized elements.
-         * @param shape Vector specifying the size of each dimension.
-         * @throws std::invalid_argument if any dimension is zero.
-         */
+        /// Initializes tensor with a given shape.
         Tensor(std::vector<uint64_t> shape)
             : _shape(std::move(shape)),
               _strides(_shape.size(), 1)
@@ -133,14 +96,7 @@ namespace Tensor
         /// Default destructor.
         ~Tensor() = default;
 
-        /**
-         * @brief Mutable element access.
-         * @tparam Indices Variadic list of index arguments.
-         * @param idxs N-dimensional indices.
-         * @return Reference to the element.
-         * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
-         * @throws std::out_of_range if any index is invalid.
-         */
+        /// Mutable element access with bounds checking.
         template<typename... Indices>
         T& operator()(Indices... idxs)
         {
@@ -153,14 +109,7 @@ namespace Tensor
             return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)];
         }
 
-        /**
-         * @brief Const element access.
-         * @tparam Indices Variadic list of index arguments.
-         * @param idxs N-dimensional indices.
-         * @return Const reference to the element.
-         * @throws std::invalid_argument if number of indicies given doesn't match tensor's. 
-         * @throws std::out_of_range if any index is invalid.
-         */
+        /// Const element access with bounds checking.
         template<typename... Indices>
         const T& operator()(Indices... idxs) const
         {
@@ -173,86 +122,52 @@ namespace Tensor
             return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)];
         }
 
-        /**
-        * @brief Fast unchecked element access.
-        * @tparam Indices Variadic list of index arguments.
-        * @param idxs N-dimensional indices.
-        * @return Reference to the selected element.
-        *
-        * @note Out-of-range indices result in undefined behavior.
-        */
+        /// Fast unchecked mutable element access.
         template<typename... Indices>
         inline T& unchecked(Indices... idxs)
         {
             return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)] ;          
         }
 
+        /// Fast unchecked const element access.
         template<typename... Indices>
         inline const T& unchecked(Indices... idxs) const
         {
             return _data[computeFlatUnrolled(std::index_sequence_for<Indices...>{}, idxs...)] ;          
         }
 
-        /**
-        * @brief Compare two tensors for equality.
-        * @param otherTensor The tensor to compare with.
-        * @return true if shapes and data match exactly, false otherwise.
-        */
+        /// Equality comparison.
         bool operator==(const Tensor<T>& otherTensor) const noexcept
         {
             return _shape == otherTensor._shape &&
                    _data == otherTensor._data;
         }
 
-        /**
-        * @brief Compare two tensors for inequality.
-        * @param otherTensor The tensor to compare with.
-        * @return true if tensors differ, false otherwise.
-        */
+        /// Inequality comparison.
         bool operator!=(const Tensor<T>& otherTensor) const noexcept
         {
             return !(*this == otherTensor);
         }
 
-        /**
-        * @brief Element-wise addition.
-        * @param otherTensor Tensor to add.
-        * @return Resulting tensor after element-wise addition.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// Element-wise addition.
         Tensor<T> operator+(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::plus<T>());
         }
 
-        /**
-        * @brief Element-wise subtraction.
-        * @param otherTensor Tensor to subtract.
-        * @return New tensor containing element-wise differences.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// Element-wise subtraction.
         Tensor<T> operator-(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::minus<T>());
         }
 
-        /**
-        * @brief Element-wise multiplication.
-        * @param otherTensor Tensor to multiply with.
-        * @return Tensor containing element-wise products.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// Element-wise multiplication.
         Tensor<T> operator*(const Tensor<T>& otherTensor) const
         {
             return elementWiseOp(otherTensor, std::multiplies<T>());
         }
 
-        /**
-        * @brief Element-wise division.
-        * @param otherTensor Tensor providing divisors.
-        * @return Tensor containing element-wise quotients.
-        * @throws std::invalid_argument if shapes differ or any divisor is zero.
-        */
+        /// Element-wise division.
         Tensor<T> operator/(const Tensor<T>& otherTensor) const
         {
             if (_shape != otherTensor._shape) 
@@ -273,16 +188,11 @@ namespace Tensor
                         throw std::invalid_argument("Can't divide by 0");
                     }                    
                 }
-
                 return elementWiseOp(otherTensor, std::divides<T>());
             }
         }
 
-        /**
-        * @brief Multiply all elements by a scalar.
-        * @param scalar Scalar multiplier.
-        * @return New tensor after scalar multiplication.
-        */
+        /// Scalar multiplication.
         Tensor<T> operator*(const T& scalar) const
         {
             Tensor<T> result(_shape);
@@ -293,12 +203,7 @@ namespace Tensor
             return result;
         }
 
-        /**
-        * @brief Divide all elements by a scalar.
-        * @param scalar Divisor.
-        * @return New tensor after scalar division.
-        * @throws std::invalid_argument if scalar is zero.
-        */
+        /// Scalar division.
         Tensor<T> operator/(const T& scalar) const
         {
             if (scalar == 0) 
@@ -314,12 +219,7 @@ namespace Tensor
             return result;
         }
 
-        /**
-        * @brief In-place element-wise addition.
-        * @param otherTensor Tensor to add.
-        * @return Reference to this tensor.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// In-place element-wise addition.
         Tensor<T>& operator+=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -336,12 +236,7 @@ namespace Tensor
             return *this;
         }
         
-        /**
-        * @brief In-place element-wise subtraction.
-        * @param otherTensor Tensor to subtract.
-        * @return Reference to this tensor.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// In-place element-wise subtraction.
         Tensor<T>& operator-=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -358,12 +253,7 @@ namespace Tensor
             return *this;
         }
 
-        /**
-        * @brief In-place element-wise multiplication.
-        * @param otherTensor Tensor to multiply with.
-        * @return Reference to this tensor.
-        * @throws std::invalid_argument if shapes do not match.
-        */
+        /// In-place element-wise multiplication.
         Tensor<T>& operator*=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -380,12 +270,7 @@ namespace Tensor
             return *this;
         }
 
-        /**
-        * @brief In-place element-wise division.
-        * @param otherTensor Tensor providing divisors.
-        * @return Reference to this tensor.
-        * @throws std::invalid_argument if shapes differ or any divisor is zero.
-        */
+        /// In-place element-wise division.
         Tensor<T>& operator/=(const Tensor<T>& otherTensor)
         {
             if (_shape != otherTensor._shape) 
@@ -421,11 +306,7 @@ namespace Tensor
             return *this;
         }
 
-        /**
-        * @brief In-place scalar multiplication.
-        * @param scalar Multiplier.
-        * @return Reference to this tensor.
-        */
+        /// In-place scalar multiplication.
         Tensor<T>& operator*=(const T& scalar)
         {
             std::transform(_data.begin(),
@@ -435,12 +316,7 @@ namespace Tensor
             return *this;
         }
 
-        /**
-        * @brief In-place scalar division.
-        * @param scalar Divisor.
-        * @return Reference to this tensor.
-        * @throws std::invalid_argument if scalar is zero.
-        */
+        /// In-place scalar division.
         Tensor<T>& operator/=(const T& scalar)
         {
             if (scalar == 0) 
@@ -456,11 +332,7 @@ namespace Tensor
             return *this;
         }
 
-        /**
-         * @brief Fill the tensor with a specified value.
-         * @tparam U Type convertible to T.
-         * @param value Value to fill.
-         */
+        /// Fills tensor with a specific value.
         template<typename U>
         void fill(const U& value)
         {
@@ -470,59 +342,30 @@ namespace Tensor
 
         // --- Utilities ---
 
-        /**
-        * @brief Get the tensor's shape.
-        * @return Vector of dimension sizes.
-        */
+        /// Gets tensor dimension sizes.
         const std::vector<uint64_t>& shape() const noexcept { return _shape; }
 
-        /**
-        * @brief Get the number of dimensions.
-        * @return Tensor rank.
-        */
+        /// Gets tensor rank (number of dimensions).
         uint64_t rank() const noexcept { return _shape.size(); }
         
-        /**
-        * @brief Get total number of stored elements.
-        * @return Element count.
-        */
+        /// Gets total element count.
         uint64_t size() const noexcept { return _data.size(); }
 
-        /**
-         * @brief Get a pointer to the underlying contiguous data storage.
-         * @return Pointer to the first element in the tensor.
-         */
+        /// Gets mutable pointer to raw data.
         T* data() noexcept { return _data.data(); }
         
-        /**
-         * @brief Get a const pointer to the underlying contiguous data storage.
-         * @return Const pointer to the first element in the tensor.
-         */
+        /// Gets const pointer to raw data.
         const T* data() const noexcept { return _data.data(); }
     };
 
-    /**
-     * @brief Scalar-tensor multiplication (scalar on left-hand side).
-     * @tparam T Tensor element type.
-     * @tparam U Scalar type.
-     * @param scalar Scalar value.
-     * @param tensor Tensor object.
-     * @return New tensor after scalar multiplication.
-     */
+    /// Left-hand scalar multiplication.
     template<typename T, typename U>
     Tensor<T> operator*(const U& scalar, const Tensor<T>& tensor)
     {
         return tensor * scalar;
     }
 
-    /**
-     * @brief Performs standard Matrix Multiplication.
-     * @note Optimized for cache-friendliness using a row-major dot product approach.
-     * @param srcTnsr1 Left-hand matrix.
-     * @param srcTnsr2 Right-hand matrix.
-     * @param outTnsr Output matrix where results are stored.
-     * @throws std::invalid_argument If input tensors are not 2D or if dimensions are incompatible.
-     */
+    /// Performs 2D matrix multiplication.
     template<typename T>
     void matmul(const Tensor<T>& srcTnsr1, const Tensor<T>& srcTnsr2, Tensor<T>& outTnsr)
     {
@@ -563,13 +406,7 @@ namespace Tensor
         }
     }
 
-    /**
-     * @brief Performs Matrix-Vector Multiplication.
-     * @param srcTnsr The input matrix.
-     * @param srcVec The input vector, must be a 1D tensor.
-     * @param outVec The output vector where results are stored.
-     * @throws std::invalid_argument if dimensions or ranks are mismatched.
-     */
+    /// Performs matrix-vector multiplication.
     template<typename T>
     void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
     {
@@ -606,12 +443,7 @@ namespace Tensor
         }
     }
 
-    /**
-     * @brief Transposes a 2D matrix.
-     * @param srcTnsr The input matrix to transpose.
-     * @param outTnsr The output matrix to store the result. Supports in-place for square matrices.
-     * @throws std::runtime_error If the input is not a 2D tensor.
-     */
+    /// Transposes a 2D matrix (supports in-place for square matrices).
     template<typename T>
     void transpose(Tensor<T>& srcTnsr, Tensor<T>& outTnsr)
     {
