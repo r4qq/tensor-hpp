@@ -1,7 +1,8 @@
 /**
  * @file Tensor.hpp
  * @brief Lightweight generic N-dimensional tensor.
- * @author r4qq (2025-2026)
+ * @author r4qq 
+ * @date 2025-2026
  */
 
 #pragma once
