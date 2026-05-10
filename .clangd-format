@@ -1,0 +1,18 @@
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+UseTab: Never
+
+ColumnLimit: 80
+
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  BeforeElse: false
+  AfterControlStatement: Never
+
+SpaceBeforeParens: ControlStatements # space after 'if', but not function call
