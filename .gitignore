@@ -1,5 +1,7 @@
 /*
 
+!.clangd
+!.clangd-format
 !Makefile
 !.gitignore
 !*.hpp
