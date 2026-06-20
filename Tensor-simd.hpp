@@ -398,8 +398,6 @@ namespace Tensor
         {
             uint64_t vecEnd = (c2 / 8) * 8;
             uint64_t iLim = (r1 / 4) * 4;
-
-            #pragma omp parallel for collapse(2)
             for (uint64_t i = 0; i < iLim; i += 4) 
             {
                 const T* st1Row0 = st1Ptr + ((i + 0) * c1);
@@ -482,8 +480,6 @@ namespace Tensor
         {
             uint64_t vecEnd = (c2 / 4) * 4;
             uint64_t iLim = (r1 / 4) * 4;
-            
-            #pragma omp parallel for collapse(2)
             for (uint64_t i = 0; i < iLim; i += 4) 
             {
                 const T* aRow0 = st1Ptr + ((i + 0) * c1);

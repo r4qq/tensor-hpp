@@ -395,7 +395,6 @@ namespace Tensor
 
         if constexpr (std::is_same_v<T, float>) 
         {
-            #pragma omp parallel for collapse(2)
             for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
             {
                 for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
@@ -492,7 +491,6 @@ namespace Tensor
         }
         else if constexpr (std::is_same_v<T, double>) 
         {
-            #pragma omp parallel for collapse(2)
             for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
             {
                 for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
@@ -635,7 +633,7 @@ namespace Tensor
         {
             uint64_t vecEnd = (r2 / 8) * 8;
             uint64_t iLim = (r1 / 4) * 4;
-                        
+
             for (uint64_t i = 0; i < iLim; i += 4) 
             {
                 T tmp[8];
