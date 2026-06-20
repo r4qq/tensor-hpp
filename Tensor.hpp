@@ -391,6 +391,7 @@ namespace Tensor
         
         outTnsr.fill(T{0});
         
+        #pragma omp parallel for
         for (uint64_t i = 0; i < r1; ++i) 
         {
             const T* st1Row = st1Ptr + (i * c1);
@@ -432,6 +433,7 @@ namespace Tensor
         
         outVec.fill(T{0});
 
+        #pragma omp parallel for
         for (uint64_t i = 0; i < r1; ++i) 
         {
             const T* stRow = stPtr + (i * r2);
