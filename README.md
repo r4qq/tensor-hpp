@@ -1,42 +1,42 @@
-# tensor-hpp
+## tensor-hpp
 
-**Note: Educational Project**
-This is a lightweight, header-only C++17 library developed to explore hardware-level optimizations, modern C++ template metaprogramming, and linear algebra implementation. It is not intended for production environments.
+#### Note: Educational Project
+A lightweight, header-only C++17 library built to explore hardware-level optimizations, template metaprogramming, and linear algebra performance. Not intended for production.
 
-## Technical Overview
+### Architecture & Optimizations
 
-The project implements a generic N-dimensional tensor class with an emphasis on performance scaling. It demonstrates the progression from a standard C++ implementation to a highly optimized kernel utilizing SIMD instructions and CPU cache awareness.
+ - Modern-ish C++: Variadic templates for N-dimensional indexing, if constexpr branching, and compile-time type constraints (std::is_arithmetic).
 
-### Core Concepts Applied
-* **Modern C++:** Variadic templates for N-dimensional indexing, `if constexpr` for compile-time branch evaluation, and compile-time type assertions (`std::is_arithmetic`).
-* **Hardware Optimization:** Explicit SIMD vectorization using AVX2 and Fused Multiply-Add (FMA) intrinsics.
-* **Memory Architecture:** Row-major contiguous memory layout, loop unrolling, and cache-tiled matrix multiplication (blocking) to minimize L1/L2 cache misses.
-* **API Design:** Operator overloading for element-wise arithmetic, providing both strict bounds-checked access via `()` and fast unchecked access for hot loops.
+ - Hardware Intrinsics: Explicit SIMD vectorization utilizing AVX2 and Fused Multiply-Add (FMA).
 
-## Repository Structure
+ - Memory Hierarchy: Row-major contiguous layout, explicit loop unrolling, and L1/L2 cache-tiled blocking to minimize cache misses.
 
-The library is separated into three distinct implementations to demonstrate the impact of different optimization techniques:
+ - Multithreading: OpenMP  for parallel scaling across CPU cores in every implementation.
 
-* **`Tensor.hpp`**
-  A standard, STL-compliant implementation. Focuses on correctness, memory layout, and generic N-dimensional logic.
-* **`Tensor-simd.hpp`**
-  Replaces standard loops in `matmul` and `matvec` with AVX2/FMA intrinsic kernels (8-wide for `float`, 4-wide for `double`). Includes loop unrolling to maximize register usage.
-* **`Tensor-simd-block.hpp`**
-  Combines the AVX2 kernels with cache blocking (BLOCK_SIZE 32). Partitions matrices into smaller tiles to ensure data remains resident in the CPU cache during multi-pass computations.
+### Implementations
 
-## System Requirements
+The library exposes three headers to show optimization progression:
 
-* C++17 compliant compiler.
-* CPU with AVX2 and FMA support (for SIMD headers).
-* Zero third-party dependencies (utilizes STL and `<immintrin.h>`).
+ - Tensor.hpp: Standard C++ STL implementation. Focuses on correctness and generic N-dimensional memory layout.
 
-## Example
+ - Tensor-simd.hpp: Replaces standard loops with AVX2/FMA intrinsic kernels (8-wide float, 4-wide double) and loop unrolling.
+
+ - Tensor-simd-block.hpp: Combines AVX2 kernels with L1 cache blocking (tiled matrix multiplication) and OpenMP multithreading.
+
+### Requirements & Compilation
+
+ - C++17 
+
+ - CPU with AVX2 and FMA support
+
+ - OpenMP (Required for multi-core) 
+
+### Example
 
 ```cpp
 #include "Tensor-simd-block.hpp"
 
 int main() {
-    // Initialize 2D tensors (matrices)
     Tensor::Tensor<float> A({1000, 1000});
     Tensor::Tensor<float> B({1000, 1000});
     Tensor::Tensor<float> C({1000, 1000});
@@ -44,13 +44,10 @@ int main() {
     A.fill(1.5f);
     B.fill(2.0f);
 
-    // Element-wise arithmetic operations
-    A += B;
+    A += B; 
 
-    // Cache-blocked, SIMD-accelerated matrix multiplication
     Tensor::matmul(A, B, C);
 
-    // Matrix-vector multiplication
     Tensor::Tensor<float> x({1000});
     Tensor::Tensor<float> y({1000});
     x.fill(1.0f);
@@ -61,14 +58,16 @@ int main() {
 }
 ```
 
-## Error Handling
-The library throws standard C++ exceptions:
-- std::invalid_argument: Shape mismatch, incorrect index count, or division by zero.
-- std::out_of_range: Out-of-bounds access.
-- std::runtime_error: Matrix operations on non-2D tensors or result shape mismatches.
+### Error Handling
 
-## License
-Project released under the MIT License. See the LICENSE file for details.
+ - std::invalid_argument: Shape mismatch, incorrect index count, or division by zero.
 
----
-Author: r4qq (2025-2026)
+ - std::out_of_range: Out-of-bounds memory access.
+
+ - std::runtime_error: Dimensionality requirements not met (e.g., non-2D matmul).
+
+### License
+
+MIT License. See the LICENSE file for details.
+
+#### Author: r4qq (2025-2026)
