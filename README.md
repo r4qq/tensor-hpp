@@ -21,7 +21,10 @@ The library exposes three headers to show optimization progression:
 
  - Tensor-simd.hpp: Replaces standard loops with AVX2/FMA intrinsic kernels (8-wide float, 4-wide double) and loop unrolling.
 
- - Tensor-simd-block.hpp: Combines AVX2 kernels with L1 cache blocking (tiled matrix multiplication) and OpenMP multithreading.
+ - Tensor-simd-block.hpp: Combines AVX2 kernels with L1 cache blocking (tiled matrix multiplication).
+
+ - Tensor-simd-block-multi.hpp: Adds OpenMP multithreading.
+
 
 ### Requirements & Compilation
 
