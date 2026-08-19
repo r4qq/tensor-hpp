@@ -16,10 +16,10 @@
 #include <vector>
 #include <immintrin.h>
 
-#define BLOCK_SIZE 32
-
 namespace Tensor
 {
+    constexpr uint64_t BLOCK_SIZE = 32;
+
     /// N-dimensional generic tensor for numeric types.
     template<typename T>
     class Tensor
@@ -97,7 +97,10 @@ namespace Tensor
             _data.resize(totalSize);
         }
 
-        /// Default destructor.
+        Tensor(const Tensor&) = default;
+        Tensor(Tensor&&) = default;
+        Tensor& operator=(const Tensor&) = default;
+        Tensor& operator=(Tensor&&) = default;
         ~Tensor() = default;
 
         /// Mutable element access with bounds checking.
@@ -391,7 +394,6 @@ namespace Tensor
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = scrTnsr2.data();
         T* otPtr = outTnsr.data();
-        outTnsr.fill(T{0});
 
         if constexpr (std::is_same_v<T, float>) 
         {
@@ -629,8 +631,6 @@ namespace Tensor
         const T* svPtr = srcVec.data();
         T* outPtr = outVec.data();
         
-        outVec.fill(T{0});
-
         if constexpr (std::is_same_v<T, float>) 
         {
             uint64_t vecEnd = (r2 / 8) * 8;
