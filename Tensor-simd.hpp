@@ -394,6 +394,7 @@ namespace Tensor
         uint64_t c2 = srcTnsr2.shape()[1];
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = srcTnsr2.data();
+        outTnsr.fill(T{0});
         T* otPtr = outTnsr.data();
 
         if constexpr (std::is_same_v<T, float>) 
@@ -602,6 +603,7 @@ namespace Tensor
         uint64_t r2 = srcVec.shape()[0];
         const T* stPtr = srcTnsr.data();
         const T* svPtr = srcVec.data();
+        outVec.fill(T{0});
         T* outPtr = outVec.data();
         
         if constexpr (std::is_same_v<T, float>) 

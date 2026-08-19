@@ -24,7 +24,9 @@ namespace Tensor
     template<typename T>
     class Tensor
     {
-        static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
+        static_assert(std::is_arithmetic<T>::value &&
+                   (std::is_same<T, bool>::value == false),
+                    "Type must be numeric (no bool)");
 
     private:
         std::vector<uint64_t> _shape;     ///< Tensor dimensions.
@@ -393,8 +395,8 @@ namespace Tensor
         uint64_t c2 = scrTnsr2.shape()[1];
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = scrTnsr2.data();
-        T* otPtr = outTnsr.data();
         outTnsr.fill(T{0});
+        T* otPtr = outTnsr.data();
 
         if constexpr (std::is_same_v<T, float>) 
         {
@@ -628,10 +630,9 @@ namespace Tensor
         uint64_t r2 = srcVec.shape()[0];
         const T* stPtr = srcTnsr.data();
         const T* svPtr = srcVec.data();
+        outVec.fill(T{0});
         T* outPtr = outVec.data();
         
-        outVec.fill(T{0});
-
         if constexpr (std::is_same_v<T, float>) 
         {
             uint64_t vecEnd = (r2 / 8) * 8;
