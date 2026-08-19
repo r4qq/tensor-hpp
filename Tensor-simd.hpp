@@ -17,15 +17,15 @@
 #include <vector>
 #include <immintrin.h>
 
-#define BLOCK_SIZE 256
-
 namespace Tensor
 {
     /// N-dimensional generic tensor for numeric types.
     template<typename T>
     class Tensor
     {
-        static_assert(std::is_arithmetic<T>::value, "Type must be numeric");
+      static_assert(std::is_arithmetic<T>::value &&
+                   (std::is_same<T, bool>::value == false),
+                    "Type must be numeric (no bool)");
 
     private:
         std::vector<uint64_t> _shape;     ///< Tensor dimensions.
@@ -98,7 +98,10 @@ namespace Tensor
             _data.resize(totalSize);
         }
 
-        /// Default destructor.
+        Tensor(const Tensor&) = default;
+        Tensor(Tensor&&) = default;
+        Tensor& operator=(const Tensor&) = default;
+        Tensor& operator=(Tensor&&) = default;
         ~Tensor() = default;
 
         /// Mutable element access with bounds checking.
@@ -392,7 +395,6 @@ namespace Tensor
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = srcTnsr2.data();
         T* otPtr = outTnsr.data();
-        outTnsr.fill(T{0});
 
         if constexpr (std::is_same_v<T, float>) 
         {
@@ -602,8 +604,6 @@ namespace Tensor
         const T* svPtr = srcVec.data();
         T* outPtr = outVec.data();
         
-        outVec.fill(T{0});
-
         if constexpr (std::is_same_v<T, float>) 
         {
             uint64_t vecEnd = (r2 / 8) * 8;

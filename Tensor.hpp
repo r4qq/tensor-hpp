@@ -94,7 +94,10 @@ namespace Tensor
             _data.resize(totalSize);
         }
 
-        /// Default destructor.
+        Tensor(const Tensor&) = default;
+        Tensor(Tensor&&) = default;
+        Tensor& operator=(const Tensor&) = default;
+        Tensor& operator=(Tensor&&) = default;
         ~Tensor() = default;
 
         /// Mutable element access with bounds checking.
@@ -388,9 +391,7 @@ namespace Tensor
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = srcTnsr2.data();
         T* otPtr = outTnsr.data();
-        
-        outTnsr.fill(T{0});
-        
+                
         for (uint64_t i = 0; i < r1; ++i) 
         {
             const T* st1Row = st1Ptr + (i * c1);
@@ -430,8 +431,6 @@ namespace Tensor
         const T* svPtr = srcVec.data();
         T* ovPtr = outVec.data();
         
-        outVec.fill(T{0});
-
         for (uint64_t i = 0; i < r1; ++i) 
         {
             const T* stRow = stPtr + (i * r2);
