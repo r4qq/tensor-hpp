@@ -625,10 +625,10 @@ namespace Tensor
                         float32x4_t st1Sclr2 = vdupq_n_f32(st1Row2[k]);
                         float32x4_t st1Sclr3 = vdupq_n_f32(st1Row3[k]);
  
-                        otVec0 = vmlaq_f32(otVec0, st1Sclr0, st2Vec); 
-                        otVec1 = vmlaq_f32(otVec1, st1Sclr1, st2Vec); 
-                        otVec2 = vmlaq_f32(otVec2, st1Sclr2, st2Vec); 
-                        otVec3 = vmlaq_f32(otVec3, st1Sclr3, st2Vec); 
+                        otVec0 = vfmaq_f32(otVec0, st1Sclr0, st2Vec); 
+                        otVec1 = vfmaq_f32(otVec1, st1Sclr1, st2Vec); 
+                        otVec2 = vfmaq_f32(otVec2, st1Sclr2, st2Vec); 
+                        otVec3 = vfmaq_f32(otVec3, st1Sclr3, st2Vec); 
                     }
                     
                     vst1q_f32(&otRow0[j], otVec0);
@@ -664,7 +664,7 @@ namespace Tensor
                     {
                         float32x4_t st2Vec = vld1q_f32(&st2Row[j]);
                         float32x4_t otVec = vld1q_f32(&otRow[j]);
-                        otVec = vmlaq_f32(otVec, aSclr, st2Vec);
+                        otVec = vfmaq_f32(otVec, aSclr, st2Vec);
                         vst1q_f32(&otRow[j], otVec);
                     }
                     
@@ -708,10 +708,10 @@ namespace Tensor
                         float64x2_t aSclr2 = vdupq_n_f64(aRow2[k]);
                         float64x2_t aSclr3 = vdupq_n_f64(aRow3[k]);
  
-                        cVec0 = vmlaq_f64(cVec0, aSclr0, bVec); 
-                        cVec1 = vmlaq_f64(cVec1, aSclr1, bVec); 
-                        cVec2 = vmlaq_f64(cVec2, aSclr2, bVec); 
-                        cVec3 = vmlaq_f64(cVec3, aSclr3, bVec); 
+                        cVec0 = vfmaq_f64(cVec0, aSclr0, bVec); 
+                        cVec1 = vfmaq_f64(cVec1, aSclr1, bVec); 
+                        cVec2 = vfmaq_f64(cVec2, aSclr2, bVec); 
+                        cVec3 = vfmaq_f64(cVec3, aSclr3, bVec); 
                     }
                     
                     vst1q_f64(&cRow0[j], cVec0);
@@ -747,7 +747,7 @@ namespace Tensor
                     {
                         float64x2_t st2Vec = vld1q_f64(&st2Row[j]);
                         float64x2_t otVec = vld1q_f64(&otRow[j]);
-                        otVec = vmlaq_f64(otVec, aSclr, st2Vec);
+                        otVec = vfmaq_f64(otVec, aSclr, st2Vec);
                         vst1q_f64(&otRow[j], otVec);
                     }
                     
@@ -990,10 +990,10 @@ namespace Tensor
                     float32x4_t stRowVec2 = vld1q_f32(&stRow2[j]);
                     float32x4_t stRowVec3 = vld1q_f32(&stRow3[j]);
                     
-                    acc0 = vmlaq_f32(acc0, stRowVec0, vecVec);
-                    acc1 = vmlaq_f32(acc1, stRowVec1, vecVec);
-                    acc2 = vmlaq_f32(acc2, stRowVec2, vecVec);
-                    acc3 = vmlaq_f32(acc3, stRowVec3, vecVec);
+                    acc0 = vfmaq_ffm(acc0, stRowVec0, vecVec);
+                    acc1 = vfmaq_ffm(acc1, stRowVec1, vecVec);
+                    acc2 = vfmaq_ffm(acc2, stRowVec2, vecVec);
+                    acc3 = vfmaq_f32(acc3, stRowVec3, vecVec);
                 }
                 vst1q_f32(tmp, acc0);
                 sum0 = tmp[0] + tmp[1] + tmp[2] + tmp[3];
@@ -1062,10 +1062,10 @@ namespace Tensor
                     float64x2_t stRowVec2 = vld1q_f64(&stRow2[j]);
                     float64x2_t stRowVec3 = vld1q_f64(&stRow3[j]);
                     
-                    acc0 = vmlaq_f64(acc0, stRowVec0, vecVec);
-                    acc1 = vmlaq_f64(acc1, stRowVec1, vecVec);
-                    acc2 = vmlaq_f64(acc2, stRowVec2, vecVec);
-                    acc3 = vmlaq_f64(acc3, stRowVec3, vecVec);
+                    acc0 = vfmaq_f64(acc0, stRowVec0, vecVec);
+                    acc1 = vfmaq_f64(acc1, stRowVec1, vecVec);
+                    acc2 = vfmaq_f64(acc2, stRowVec2, vecVec);
+                    acc3 = vfmaq_f64(acc3, stRowVec3, vecVec);
                 }
 
                 vst1q_f64(tmp, acc0);
