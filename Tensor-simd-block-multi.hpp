@@ -14,7 +14,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-#include <immintrin.h>
+
+#if defined(__AVX2__)
+    #include <immintrin.h>
+#elif defined(__aarch64__)
+    #include <arm_neon.h>
+#endif
 
 namespace Tensor
 {
@@ -23,9 +28,10 @@ namespace Tensor
     /// N-dimensional generic tensor for numeric types.
     template<typename T>
     class Tensor
-    {static_assert(std::is_arithmetic<T>::value &&
+    {
+        static_assert(std::is_arithmetic<T>::value &&
                    (std::is_same<T, bool>::value == false),
-                    "Type must be numeric (no bool)");;
+                    "Type must be numeric (no bool)");
 
     private:
         std::vector<uint64_t> _shape;     ///< Tensor dimensions.
@@ -394,9 +400,28 @@ namespace Tensor
         uint64_t c2 = scrTnsr2.shape()[1];
         const T* st1Ptr = srcTnsr1.data();
         const T* st2Ptr = scrTnsr2.data();
-        outTnsr.fill(0);
+        outTnsr.fill(T{0});
         T* otPtr = outTnsr.data();
 
+        auto genericMatmul = [&]()
+        {
+            for (uint64_t i = 0; i < r1; ++i) 
+            {
+                const T* st1Row = st1Ptr + (i * c1);
+                T* otRow = otPtr + (i * c2);
+                for (uint64_t k = 0; k < c1; ++k) 
+                {
+                    T st1Sclr = st1Row[k]; 
+                    const T* st2Row = st2Ptr + (k * c2);
+                    for (uint64_t j = 0; j < c2; ++j) 
+                    {
+                        otRow[j] += st1Sclr * st2Row[j];
+                    }
+                }
+            }
+        };
+
+#if defined(__AVX2__)
         if constexpr (std::is_same_v<T, float>) 
         {
             #pragma omp parallel for
@@ -593,24 +618,213 @@ namespace Tensor
         }
         else
         {
-            for (uint64_t i = 0; i < r1; ++i) 
+            genericMatmul();
+        }
+#elif defined(__aarch64__)
+        if constexpr (std::is_same_v<T, float>) 
+        {
+            #pragma omp parallel for
+            for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
             {
-                const T* st1Row = st1Ptr + (i * c1);
-                T* otRow = otPtr + (i * c2);
-                for (uint64_t k = 0; k < c1; ++k) 
+                for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
                 {
-                    T st1Sclr = st1Row[k]; 
-                    const T* st2Row = st2Ptr + (k * c2);
-                    for (uint64_t j = 0; j < c2; ++j) 
+                    for (uint64_t kk = 0; kk < c1; kk += BLOCK_SIZE) 
                     {
-                        otRow[j] += st1Sclr * st2Row[j];
+                        uint64_t iMin = std::min(ii + BLOCK_SIZE, r1);
+                        uint64_t jMin = std::min(jj + BLOCK_SIZE, c2);
+                        uint64_t kMin = std::min(kk + BLOCK_SIZE, c1);
+            
+                        uint64_t iLim = ii + ((iMin - ii) / 4) * 4;
+                        uint64_t vecEnd = jj + ((jMin - jj) / 4 ) * 4;
+
+                        for (uint64_t i = ii; i < iLim; i += 4) 
+                        {
+                            const T* st1Row0 = st1Ptr + ((i + 0) * c1);
+                            const T* st1Row1 = st1Ptr + ((i + 1) * c1);
+                            const T* st1Row2 = st1Ptr + ((i + 2) * c1);
+                            const T* st1Row3 = st1Ptr + ((i + 3) * c1);
+
+                            T* otRow0 = otPtr + ((i + 0) * c2);
+                            T* otRow1 = otPtr + ((i + 1) * c2);
+                            T* otRow2 = otPtr + ((i + 2) * c2);
+                            T* otRow3 = otPtr + ((i + 3) * c2);
+
+                            for (uint64_t j = jj; j < vecEnd; j += 4) 
+                            {
+                                float32x4_t otVec0 = vld1q_f32(&otRow0[j]);
+                                float32x4_t otVec1 = vld1q_f32(&otRow1[j]);
+                                float32x4_t otVec2 = vld1q_f32(&otRow2[j]);
+                                float32x4_t otVec3 = vld1q_f32(&otRow3[j]);
+                                
+                                for (uint64_t k = kk; k < kMin; ++k) 
+                                {
+                                    float32x4_t st2Vec = vld1q_f32(&st2Ptr[k * c2  + j]);
+ 
+                                    float32x4_t st1Sclr0 = vdupq_n_f32(st1Row0[k]);
+                                    float32x4_t st1Sclr1 = vdupq_n_f32(st1Row1[k]);
+                                    float32x4_t st1Sclr2 = vdupq_n_f32(st1Row2[k]);
+                                    float32x4_t st1Sclr3 = vdupq_n_f32(st1Row3[k]);
+            
+                                    otVec0 = vfmaq_f32(otVec0, st1Sclr0, st2Vec); 
+                                    otVec1 = vfmaq_f32(otVec1, st1Sclr1, st2Vec); 
+                                    otVec2 = vfmaq_f32(otVec2, st1Sclr2, st2Vec); 
+                                    otVec3 = vfmaq_f32(otVec3, st1Sclr3, st2Vec); 
+                                }
+                                
+                                vst1q_f32(&otRow0[j], otVec0);
+                                vst1q_f32(&otRow1[j], otVec1);
+                                vst1q_f32(&otRow2[j], otVec2);
+                                vst1q_f32(&otRow3[j], otVec3);
+                            }
+                            for (uint64_t j = vecEnd; j < jMin; ++j) 
+                            {   
+                                for (uint64_t k = kk; k < kMin; ++k)
+                                {                        
+                                    otRow0[j] += st1Row0[k] * st2Ptr[k * c2 + j];
+                                    otRow1[j] += st1Row1[k] * st2Ptr[k * c2 + j];
+                                    otRow2[j] += st1Row2[k] * st2Ptr[k * c2 + j];
+                                    otRow3[j] += st1Row3[k] * st2Ptr[k * c2 + j];
+
+                                }
+                            }
+                        }
+                        for (uint64_t i = iLim; i < iMin; ++i) 
+                        {
+                            const T* st1Row = st1Ptr + (i * c1);
+                            T* otRow = otPtr + (i * c2);
+            
+                            for (uint64_t k = kk; k < kMin; ++k) 
+                            {
+                                T st1Sclr = st1Row[k]; 
+                                const T* st2Row = st2Ptr + (k * c2);
+                                
+                                float32x4_t aSclr = vdupq_n_f32(st1Sclr);
+                                
+                                for (uint64_t j = jj; j < vecEnd; j += 4) 
+                                {
+                                    float32x4_t st2Vec = vld1q_f32(&st2Row[j]);
+                                    float32x4_t otVec = vld1q_f32(&otRow[j]);
+                                    otVec = vfmaq_f32(otVec, aSclr, st2Vec);
+                                    vst1q_f32(&otRow[j], otVec);
+                                }
+                                
+                                for (uint64_t j = vecEnd; j < jMin; ++j) 
+                                {
+                                    otRow[j] += st1Sclr * st2Row[j];
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+        else if constexpr (std::is_same_v<T, double>) 
+        {
+            #pragma omp parallel for
+            for (uint64_t ii = 0; ii < r1; ii += BLOCK_SIZE) 
+            {
+                for (uint64_t jj = 0; jj < c2; jj += BLOCK_SIZE) 
+                {
+                    for (uint64_t kk = 0; kk < c1; kk += BLOCK_SIZE) 
+                    {
+                        uint64_t iMin = std::min(ii + BLOCK_SIZE, r1);
+                        uint64_t jMin = std::min(jj + BLOCK_SIZE, c2);
+                        uint64_t kMin = std::min(kk + BLOCK_SIZE, c1);
+            
+                        uint64_t iLim = ii + ((iMin - ii) / 4) * 4;
+                        uint64_t vecEnd = jj + ((jMin - jj) / 2 ) * 2;
+
+                        for (uint64_t i = ii; i < iLim; i += 4) 
+                        {
+                            const T* st1Row0 = st1Ptr + ((i + 0) * c1);
+                            const T* st1Row1 = st1Ptr + ((i + 1) * c1);
+                            const T* st1Row2 = st1Ptr + ((i + 2) * c1);
+                            const T* st1Row3 = st1Ptr + ((i + 3) * c1);
+
+                            T* otRow0 = otPtr + ((i + 0) * c2);
+                            T* otRow1 = otPtr + ((i + 1) * c2);
+                            T* otRow2 = otPtr + ((i + 2) * c2);
+                            T* otRow3 = otPtr + ((i + 3) * c2);
+
+                            for (uint64_t j = jj; j < vecEnd; j += 2) 
+                            {
+                                float64x2_t otVec0 = vld1q_f64(&otRow0[j]);
+                                float64x2_t otVec1 = vld1q_f64(&otRow1[j]);
+                                float64x2_t otVec2 = vld1q_f64(&otRow2[j]);
+                                float64x2_t otVec3 = vld1q_f64(&otRow3[j]);
+                                
+                                for (uint64_t k = kk; k < kMin; ++k) 
+                                {
+                                    float64x2_t st2Vec = vld1q_f64(&st2Ptr[k * c2  + j]);
+            
+                                    float64x2_t st1Sclr0 = vdupq_n_f64(st1Row0[k]);
+                                    float64x2_t st1Sclr1 = vdupq_n_f64(st1Row1[k]);
+                                    float64x2_t st1Sclr2 = vdupq_n_f64(st1Row2[k]);
+                                    float64x2_t st1Sclr3 = vdupq_n_f64(st1Row3[k]);
+            
+                                    otVec0 = vfmaq_f64(otVec0, st1Sclr0, st2Vec); 
+                                    otVec1 = vfmaq_f64(otVec1, st1Sclr1, st2Vec); 
+                                    otVec2 = vfmaq_f64(otVec2, st1Sclr2, st2Vec); 
+                                    otVec3 = vfmaq_f64(otVec3, st1Sclr3, st2Vec); 
+                                }
+                                
+                                vst1q_f64(&otRow0[j], otVec0);
+                                vst1q_f64(&otRow1[j], otVec1);
+                                vst1q_f64(&otRow2[j], otVec2);
+                                vst1q_f64(&otRow3[j], otVec3);
+                            }
+                            for (uint64_t j = vecEnd; j < jMin; ++j) 
+                            {   
+                                for (uint64_t k = kk; k < kMin; ++k)
+                                {                        
+                                    otRow0[j] += st1Row0[k] * st2Ptr[k * c2 + j];
+                                    otRow1[j] += st1Row1[k] * st2Ptr[k * c2 + j];
+                                    otRow2[j] += st1Row2[k] * st2Ptr[k * c2 + j];
+                                    otRow3[j] += st1Row3[k] * st2Ptr[k * c2 + j];
+
+                                }
+                            }
+                        }
+                        for (uint64_t i = iLim; i < iMin; ++i) 
+                        {
+                            const T* st1Row = st1Ptr + (i * c1);
+                            T* otRow = otPtr + (i * c2);
+            
+                            for (uint64_t k = kk; k < kMin; ++k) 
+                            {
+                                T st1Sclr = st1Row[k]; 
+                                const T* st2Row = st2Ptr + (k * c2);
+                                
+                                float64x2_t aSclr = vdupq_n_f64(st1Sclr);
+                                
+                                for (uint64_t j = jj; j < vecEnd; j += 2) 
+                                {
+                                    float64x2_t st2Vec = vld1q_f64(&st2Row[j]);
+                                    float64x2_t otVec = vld1q_f64(&otRow[j]);
+                                    otVec = vfmaq_f64(otVec, aSclr, st2Vec);
+                                    vst1q_f64(&otRow[j], otVec);
+                                }
+                                
+                                for (uint64_t j = vecEnd; j < jMin; ++j) 
+                                {
+                                    otRow[j] += st1Sclr * st2Row[j];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            genericMatmul();
+        }
+#else
+        genericMatmul();
+#endif
     }
 
-    /// SIMD-optimized matrix-vector multiplication.
+    /// Performs SIMD-optimized matrix-vector multiplication.
     template<typename T>
     void matvec(const Tensor<T>& srcTnsr, const Tensor<T>& srcVec, Tensor<T>& outVec)
     {
@@ -631,9 +845,24 @@ namespace Tensor
         uint64_t r2 = srcVec.shape()[0];
         const T* stPtr = srcTnsr.data();
         const T* svPtr = srcVec.data();
-        outVec.fill(0);
+        outVec.fill(T{0});
         T* outPtr = outVec.data();
-        
+
+        auto genericMatvec = [&]()
+        {
+            for (uint64_t i = 0; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        };
+
+#if defined(__AVX2__)
         if constexpr (std::is_same_v<T, float>) 
         {
             uint64_t vecEnd = (r2 / 8) * 8;
@@ -776,28 +1005,174 @@ namespace Tensor
             
             for (uint64_t i = iLim; i < r1; ++i) 
             {
-                const T* stRow = stPtr + (i * r2);
+                const T* aRow = stPtr + (i * r2);
                 T sum = 0;
                 for (uint64_t j = 0; j < r2; ++j) 
                 {
-                    sum += stRow[j] * svPtr[j];
+                    sum += aRow[j] * svPtr[j];
                 }
                 outPtr[i] = sum;
             }
         }
         else 
         {
-            for (uint64_t i = 0; i < r1; ++i) 
+            genericMatvec();
+        }
+#elif defined(__aarch64__)
+        if constexpr (std::is_same_v<T, float>) 
+        {
+            uint64_t vecEnd = (r2 / 4) * 4;
+            uint64_t iLim = (r1 / 4) * 4;
+
+            #pragma omp parallel for
+            for (uint64_t i = 0; i < iLim; i += 4) 
             {
-                const T* stRow = stPtr + (i * r2);
+                T tmp[4];
+                T sum0{0}, sum1{0}, sum2{0}, sum3{0};
+                
+                const T* stRow0 = stPtr + ((i + 0) * r2);
+                const T* stRow1 = stPtr + ((i + 1) * r2);
+                const T* stRow2 = stPtr + ((i + 2) * r2);
+                const T* stRow3 = stPtr + ((i + 3) * r2);
+
+                float32x4_t acc0 = vdupq_n_f32(0.0f); 
+                float32x4_t acc1 = vdupq_n_f32(0.0f);
+                float32x4_t acc2 = vdupq_n_f32(0.0f);
+                float32x4_t acc3 = vdupq_n_f32(0.0f);
+
+                for (uint64_t j = 0; j < vecEnd; j += 4) 
+                {
+                    float32x4_t vecVec = vld1q_f32(&svPtr[j]);
+
+                    float32x4_t stRowVec0 = vld1q_f32(&stRow0[j]);
+                    float32x4_t stRowVec1 = vld1q_f32(&stRow1[j]);
+                    float32x4_t stRowVec2 = vld1q_f32(&stRow2[j]);
+                    float32x4_t stRowVec3 = vld1q_f32(&stRow3[j]);
+                    
+                    acc0 = vfmaq_f32(acc0, stRowVec0, vecVec);
+                    acc1 = vfmaq_f32(acc1, stRowVec1, vecVec);
+                    acc2 = vfmaq_f32(acc2, stRowVec2, vecVec);
+                    acc3 = vfmaq_f32(acc3, stRowVec3, vecVec);
+                }
+                vst1q_f32(tmp, acc0);
+                sum0 = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+
+                vst1q_f32(tmp, acc1);
+                sum1 = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+
+                vst1q_f32(tmp, acc2);
+                sum2 = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+
+                vst1q_f32(tmp, acc3);
+                sum3 = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+
+                for (uint64_t j = vecEnd; j < r2; ++j) 
+                {
+                    sum0 += stRow0[j] * svPtr[j];
+                    sum1 += stRow1[j] * svPtr[j];
+                    sum2 += stRow2[j] * svPtr[j];
+                    sum3 += stRow3[j] * svPtr[j];
+                }
+
+                outPtr[i + 0] = sum0;
+                outPtr[i + 1] = sum1;
+                outPtr[i + 2] = sum2;
+                outPtr[i + 3] = sum3;
+
+            }
+            
+            for (uint64_t i = iLim; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
                 T sum = 0;
                 for (uint64_t j = 0; j < r2; ++j) 
                 {
-                    sum += stRow[j] * svPtr[j];
+                    sum += aRow[j] * svPtr[j];
                 }
                 outPtr[i] = sum;
             }
         }
+        else if constexpr (std::is_same_v<T, double>) 
+        {
+            uint64_t vecEnd = (r2 /2) * 2;
+            uint64_t iLim = (r1 / 4) * 4;
+
+            #pragma omp parallel for
+            for (uint64_t i = 0; i < iLim; i += 4) 
+            {
+                T tmp[4];
+                T sum0{0}, sum1{0}, sum2{0}, sum3{0};
+
+                const T* stRow0 = stPtr + ((i + 0) * r2);
+                const T* stRow1 = stPtr + ((i + 1) * r2);
+                const T* stRow2 = stPtr + ((i + 2) * r2);
+                const T* stRow3 = stPtr + ((i + 3) * r2);
+
+                float64x2_t acc0 = vdupq_n_f64(0.0); 
+                float64x2_t acc1 = vdupq_n_f64(0.0);
+                float64x2_t acc2 = vdupq_n_f64(0.0);
+                float64x2_t acc3 = vdupq_n_f64(0.0);
+
+                for (uint64_t j = 0; j < vecEnd; j += 2) 
+                {
+                    float64x2_t vecVec = vld1q_f64(&svPtr[j]);
+
+                    float64x2_t stRowVec0 = vld1q_f64(&stRow0[j]);
+                    float64x2_t stRowVec1 = vld1q_f64(&stRow1[j]);
+                    float64x2_t stRowVec2 = vld1q_f64(&stRow2[j]);
+                    float64x2_t stRowVec3 = vld1q_f64(&stRow3[j]);
+                    
+                    acc0 = vfmaq_f64(acc0, stRowVec0, vecVec);
+                    acc1 = vfmaq_f64(acc1, stRowVec1, vecVec);
+                    acc2 = vfmaq_f64(acc2, stRowVec2, vecVec);
+                    acc3 = vfmaq_f64(acc3, stRowVec3, vecVec);
+                }
+
+                vst1q_f64(tmp, acc0);
+                sum0 = tmp[0] + tmp[1];
+
+                vst1q_f64(tmp, acc1);
+                sum1 = tmp[0] + tmp[1];
+
+                vst1q_f64(tmp, acc2);
+                sum2 = tmp[0] + tmp[1];
+                 
+                vst1q_f64(tmp, acc3);
+                sum3 = tmp[0] + tmp[1]; 
+
+                for (uint64_t j = vecEnd; j < r2; ++j) 
+                {
+                    sum0 += stRow0[j] * svPtr[j];
+                    sum1 += stRow1[j] * svPtr[j];
+                    sum2 += stRow2[j] * svPtr[j];
+                    sum3 += stRow3[j] * svPtr[j];
+                }
+
+                outPtr[i + 0] = sum0;
+                outPtr[i + 1] = sum1;
+                outPtr[i + 2] = sum2;
+                outPtr[i + 3] = sum3;
+
+            }
+            
+            for (uint64_t i = iLim; i < r1; ++i) 
+            {
+                const T* aRow = stPtr + (i * r2);
+                T sum = 0;
+                for (uint64_t j = 0; j < r2; ++j) 
+                {
+                    sum += aRow[j] * svPtr[j];
+                }
+                outPtr[i] = sum;
+            }
+        }
+        else 
+        {
+            genericMatvec();
+        }
+#else
+       genericMatvec();
+#endif
     }
 
     /// Transposes a 2D matrix (supports in-place for square matrices).
