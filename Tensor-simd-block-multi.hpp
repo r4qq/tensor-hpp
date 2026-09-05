@@ -454,7 +454,7 @@ namespace Tensor
                             }
                             for (uint64_t j = vecEnd; j < jMin; ++j) 
                             {   
-                                for (uint64_t k = 0; k < kMin; ++k)
+                                for (uint64_t k = kk; k < kMin; ++k)
                                 {                        
                                     otRow0[j] += st1Row0[k] * st2Ptr[k * c2 + j];
                                     otRow1[j] += st1Row1[k] * st2Ptr[k * c2 + j];
@@ -551,7 +551,7 @@ namespace Tensor
                             }
                             for (uint64_t j = vecEnd; j < jMin; ++j) 
                             {   
-                                for (uint64_t k = 0; k < kMin; ++k)
+                                for (uint64_t k = kk; k < kMin; ++k)
                                 {                        
                                     otRow0[j] += st1Row0[k] * st2Ptr[k * c2 + j];
                                     otRow1[j] += st1Row1[k] * st2Ptr[k * c2 + j];
