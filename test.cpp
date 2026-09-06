@@ -3,7 +3,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <chrono>
-#include "Tensor-simd-block.hpp"
+#include "Tensor-simd-block-multi.hpp"
 
 void testConstruction()
 {
