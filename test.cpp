@@ -3,6 +3,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <chrono>
+#include <vector>
 #include "Tensor-simd-block-multi.hpp"
 
 void testConstruction()
@@ -149,6 +150,15 @@ void testMatvec()
     assert(y(1) == 122);
 }
 
+void testReshape()
+{
+    Tensor::Tensor<int> t({2, 3});
+
+    t.reshape({3, 2});
+    assert(t.shape()[0] == 3);
+    assert(t.shape()[1] == 2);
+}
+
 template<typename T>
 void benchmarkMatmul()
 {
@@ -281,6 +291,7 @@ int main()
     testScalarOps();
     testMatmul();
     testTranspose();
+    testReshape();
     testEquality();
     testMatvec();
 
