@@ -362,6 +362,41 @@ namespace Tensor
         
         /// Gets const pointer to raw data.
         const T* data() const noexcept { return _data.data(); }
+        
+        /// Reshapes tensor
+        void reshape(std::vector<uint64_t> newShape)
+        {
+            if (newShape.empty())
+            {
+                throw std::invalid_argument("Shape must have at least one dimension");
+            }
+            
+            // Compute total size
+            uint64_t totalSize = 1;
+            for (uint64_t dim : newShape)
+            {
+                if (dim == 0)
+                {
+                    throw std::invalid_argument("Shape dimensions must be greater than 0");
+                }
+                totalSize *= dim;
+            }
+
+            if (_data.size() != totalSize)
+            {
+                throw std::invalid_argument("Reshape size mismatch");
+            }
+
+            _shape = std::move(newShape);
+
+            _strides.assign(_shape.size(), 1);
+
+            // Compute strides (row-major order)
+            for (uint64_t i = _shape.size(); i-- > 1; )
+            {
+                _strides[i - 1] = _strides[i] * _shape[i];
+            }
+        }
     };
 
     /// Left-hand scalar multiplication.
